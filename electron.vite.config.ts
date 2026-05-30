@@ -4,7 +4,7 @@ import { resolve } from 'path'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: ['archiver', 'unzipper'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['archiver'] })],
     build: {
       rollupOptions: {
         input: {
