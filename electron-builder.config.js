@@ -13,14 +13,14 @@ module.exports = {
     output: "release",
   },
   files: ["out/**/*", "!out/**/*.map"],
-  extraResources: [{ from: "finely.png", to: "finely.png" }],
+  extraResources: [{ from: "src/renderer/assets/finely.png", to: "src/renderer/assets/finely.png" }],
   win: {
     target: [
       { target: "nsis",     arch: ["x64"] },
       { target: "msi",      arch: ["x64"] },
       { target: "portable", arch: ["x64"] },
     ],
-    icon: "finely.png",
+    icon: "src/renderer/assets/finely.png",
   },
   nsis: {
     oneClick: false,
@@ -35,7 +35,7 @@ module.exports = {
       { target: "snap",     arch: ["x64"] },
       { target: "tar.gz",   arch: ["x64"] },
     ],
-    icon: "finely.png",
+    icon: "src/renderer/assets/finely.png",
     category: "Office",
     synopsis: "Personal income & expense tracker",
   },

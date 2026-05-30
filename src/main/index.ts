@@ -5,7 +5,7 @@ import { registerIpcHandlers } from './ipc'
 function getIconPath(): string {
   return app.isPackaged
     ? join(process.resourcesPath, 'finely.png')
-    : join(app.getAppPath(), 'finely.png')
+    : join(app.getAppPath(), 'src/renderer/assets/finely.png')
 }
 
 function createWindow(): BrowserWindow {
