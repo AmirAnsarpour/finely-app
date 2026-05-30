@@ -2,7 +2,10 @@
   "name": "finely",
   "version": "1.0.0",
   "description": "Personal income & expense tracker",
-  "author": "Amir Ansarpour",
+  "author": {
+    "name": "Amir Ansarpour",
+    "email": "amir.ansarpour2003@gmail.com"
+  },
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
