@@ -16,9 +16,7 @@ module.exports = {
   extraResources: [{ from: "src/renderer/assets/finely.png", to: "src/renderer/assets/finely.png" }],
   win: {
     target: [
-      { target: "nsis",     arch: ["x64"] },
-      { target: "msi",      arch: ["x64"] },
-      { target: "portable", arch: ["x64"] },
+      { target: "nsis", arch: ["x64"] },
     ],
     icon: "src/renderer/assets/finely.png",
   },
@@ -30,10 +28,6 @@ module.exports = {
   linux: {
     target: [
       { target: "AppImage", arch: ["x64"] },
-      { target: "deb",      arch: ["x64"] },
-      { target: "rpm",      arch: ["x64"] },
-      { target: "snap",     arch: ["x64"] },
-      { target: "tar.gz",   arch: ["x64"] },
     ],
     icon: "src/renderer/assets/finely.png",
     category: "Office",
