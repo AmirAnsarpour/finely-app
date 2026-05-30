@@ -16,10 +16,9 @@ module.exports = {
   extraResources: [{ from: "finely.png", to: "finely.png" }],
   win: {
     target: [
-      {
-        target: "nsis",
-        arch: ["x64"],
-      },
+      { target: "nsis",     arch: ["x64"] },
+      { target: "msi",      arch: ["x64"] },
+      { target: "portable", arch: ["x64"] },
     ],
     icon: "finely.png",
   },
@@ -28,12 +27,21 @@ module.exports = {
     allowToChangeInstallationDirectory: true,
     deleteAppDataOnUninstall: false,
   },
+  mac: {
+    target: [
+      { target: "dmg", arch: ["x64", "arm64"] },
+      { target: "pkg", arch: ["x64", "arm64"] },
+    ],
+    icon: "finely.png",
+    category: "public.app-category.finance",
+  },
   linux: {
     target: [
-      {
-        target: "AppImage",
-        arch: ["x64"],
-      },
+      { target: "AppImage", arch: ["x64"] },
+      { target: "deb",      arch: ["x64"] },
+      { target: "rpm",      arch: ["x64"] },
+      { target: "snap",     arch: ["x64"] },
+      { target: "tar.gz",   arch: ["x64"] },
     ],
     icon: "finely.png",
     category: "Office",
