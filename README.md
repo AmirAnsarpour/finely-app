@@ -58,7 +58,6 @@ Other scripts:
 | `bun run preview` | Preview the production build |
 | `bun run package` | Build + package for the current OS |
 | `bun run package:win` | Build + package for Windows |
-| `bun run package:mac` | Build + package for macOS |
 | `bun run package:linux` | Build + package for Linux |
 
 Packaged output lands in `release/`.
@@ -70,7 +69,6 @@ Pre-built installers are attached to every [GitHub Release](https://github.com/A
 | Platform | Format |
 |---|---|
 | Windows | NSIS installer (`.exe`), MSI (`.msi`), Portable (`.exe`) |
-| macOS | Disk image (`.dmg`), Installer package (`.pkg`) |
 | Linux | AppImage, `.deb`, `.rpm`, Snap, `.tar.gz` |
 
 ## Data Storage
@@ -95,7 +93,6 @@ bun install
 bun run package        # current OS
 bun run package:win    # Windows (cross-compile from any OS)
 bun run package:linux  # Linux (cross-compile from any OS)
-# macOS builds must run on a macOS machine
 ```
 
 ## License

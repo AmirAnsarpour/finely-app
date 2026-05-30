@@ -27,14 +27,6 @@ module.exports = {
     allowToChangeInstallationDirectory: true,
     deleteAppDataOnUninstall: false,
   },
-  mac: {
-    target: [
-      { target: "dmg", arch: ["x64", "arm64"] },
-      { target: "pkg", arch: ["x64", "arm64"] },
-    ],
-    icon: "finely.png",
-    category: "public.app-category.finance",
-  },
   linux: {
     target: [
       { target: "AppImage", arch: ["x64"] },
