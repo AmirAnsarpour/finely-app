@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import { Pencil, Trash2 } from 'lucide-react'
 import type { Transaction, Category, AppSettings } from '../types'
 import CategoryIcon from './CategoryIcon'
-import { formatCurrency, formatDateShort } from '../utils/formatters'
+import { formatCurrency } from '../utils/formatters'
+import { useCalendar } from '../utils/calendarContext'
 
 interface TransactionItemProps {
   transaction: Transaction
@@ -22,6 +23,7 @@ export default function TransactionItem({
   onDelete,
   animDelay = 0
 }: TransactionItemProps) {
+  const { formatDateShort } = useCalendar()
   const category = categories.find(c => c.id === transaction.category)
   const isIncome = transaction.type === 'income'
   const [tip, setTip] = useState<{ x: number; y: number } | null>(null)

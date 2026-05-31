@@ -25,5 +25,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   currencySymbol: '$',
   currencyLocale: 'en-US',
   theme: 'dark',
-  dataFolder: ''
+  dataFolder: '',
+  calendarType: 'gregorian',
+  weekStartDay: 0,
 }

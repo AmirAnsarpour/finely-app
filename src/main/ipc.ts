@@ -1,4 +1,4 @@
-import { ipcMain, dialog, app, BrowserWindow, shell } from 'electron'
+import { ipcMain, dialog, app, BrowserWindow, shell, Notification } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
 import path from 'path'
@@ -31,7 +31,8 @@ let config = loadConfig()
 const FILE_MAP: Record<string, string> = {
   transactions: 'transactions.json',
   categories: 'categories.json',
-  settings: 'settings.json'
+  settings: 'settings.json',
+  installments: 'installments.json'
 }
 
 function ensureDataFolder(): void {
@@ -135,6 +136,13 @@ export function registerIpcHandlers(): void {
     await fs.createReadStream(result.filePaths[0])
       .pipe(unzipper.Extract({ path: config.dataFolder }))
       .promise()
+    return true
+  })
+
+  ipcMain.handle('show-notification', async (_event, { title, body }: { title: string; body: string }) => {
+    if (Notification.isSupported()) {
+      new Notification({ title, body }).show()
+    }
     return true
   })
 

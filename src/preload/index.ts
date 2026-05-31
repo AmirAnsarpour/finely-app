@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportCSV: (data: unknown) => ipcRenderer.invoke('export-csv', data),
   exportZip: () => ipcRenderer.invoke('export-zip'),
   importZip: () => ipcRenderer.invoke('import-zip'),
+  showNotification: (data: { title: string; body: string }) => ipcRenderer.invoke('show-notification', data),
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
   windowMinimize: () => ipcRenderer.send('window-minimize'),
   windowMaximize: () => ipcRenderer.send('window-maximize'),

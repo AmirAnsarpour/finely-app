@@ -2,7 +2,7 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, ArrowLeftRight, Tag,
-  BarChart3, Settings, Minus, Square, X, Plus
+  BarChart3, Settings, Minus, Square, X, Plus, CreditCard
 } from 'lucide-react'
 import logoUrl from '../assets/finely.png'
 
@@ -11,14 +11,16 @@ const MAIN_NAV = [
   { to: '/transactions', icon: ArrowLeftRight, label: 'Transactions' },
   { to: '/categories', icon: Tag, label: 'Categories' },
   { to: '/reports', icon: BarChart3, label: 'Reports' },
+  { to: '/installments', icon: CreditCard, label: 'Installments' },
 ]
 
 interface SidebarProps {
   onOpenAdd: () => void
   budgetAlertCount?: number
+  installmentAlertCount?: number
 }
 
-export default function Sidebar({ onOpenAdd, budgetAlertCount = 0 }: SidebarProps) {
+export default function Sidebar({ onOpenAdd, budgetAlertCount = 0, installmentAlertCount = 0 }: SidebarProps) {
   return (
     <aside className="sidebar glass">
       {/* Title bar / drag region */}
@@ -58,6 +60,9 @@ export default function Sidebar({ onOpenAdd, budgetAlertCount = 0 }: SidebarProp
             <span>{label}</span>
             {to === '/reports' && budgetAlertCount > 0 && (
               <span className="sidebar__badge">{budgetAlertCount}</span>
+            )}
+            {to === '/installments' && installmentAlertCount > 0 && (
+              <span className="sidebar__badge sidebar__badge--accent">{installmentAlertCount}</span>
             )}
           </NavLink>
         ))}
@@ -168,6 +173,7 @@ export default function Sidebar({ onOpenAdd, budgetAlertCount = 0 }: SidebarProp
           font-size: 10px; font-weight: 700; letter-spacing: -0.2px;
           flex-shrink: 0; line-height: 1;
         }
+        .sidebar__badge--accent { background: var(--accent); color: #fff; }
         .sidebar__spacer { flex: 1; }
         .sidebar__divider {
           height: 1px; background: var(--glass-border);

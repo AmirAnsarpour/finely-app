@@ -8,6 +8,7 @@ interface ElectronAPI {
   exportZip: () => Promise<boolean>
   importZip: () => Promise<boolean>
   openExternal: (url: string) => Promise<void>
+  showNotification: (data: { title: string; body: string }) => Promise<boolean>
   windowMinimize: () => void
   windowMaximize: () => void
   windowClose: () => void

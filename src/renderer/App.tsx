@@ -6,10 +6,12 @@ import Transactions from './pages/Transactions'
 import Categories from './pages/Categories'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
+import Installments from './pages/Installments'
 import Modal from './components/Modal'
 import TransactionForm from './pages/TransactionForm'
 import { useData } from './hooks/useData'
 import { ToastProvider, useToast } from './components/Toast'
+import { CalendarProvider } from './utils/calendarContext'
 import { CURRENCIES, currentMonthKey, getMonthKey } from './utils/formatters'
 import logoUrl from './assets/finely.png'
 import './styles/globals.css'
@@ -111,6 +113,20 @@ function AppShell() {
     applyTheme(data.settings.theme)
   }, [data.settings.theme])
 
+  // Installments due within 7 days
+  const installmentAlertCount = useMemo(() => {
+    const today = new Date(new Date().toISOString().split('T')[0] + 'T00:00:00')
+    const sevenDaysLater = new Date(today)
+    sevenDaysLater.setDate(today.getDate() + 7)
+    return data.installments.filter(inst =>
+      inst.payments.some(p => {
+        if (p.isPaid) return false
+        const due = new Date(p.dueDate + 'T00:00:00')
+        return due >= today && due <= sevenDaysLater
+      })
+    ).length
+  }, [data.installments])
+
   // Budget alert count: categories at ≥80% of their monthly budget
   const budgetAlertCount = useMemo(() => {
     const month = currentMonthKey()
@@ -192,6 +208,7 @@ function AppShell() {
   }
 
   return (
+    <CalendarProvider settings={data.settings}>
     <div className="app-layout">
       <div className="aurora-bg">
         <div className="aurora-blob aurora-blob-1" />
@@ -199,7 +216,7 @@ function AppShell() {
         <div className="aurora-blob aurora-blob-3" />
       </div>
 
-      <Sidebar onOpenAdd={() => setShowAddModal(true)} budgetAlertCount={budgetAlertCount} />
+      <Sidebar onOpenAdd={() => setShowAddModal(true)} budgetAlertCount={budgetAlertCount} installmentAlertCount={installmentAlertCount} />
 
       <main className="main-content">
         <Routes>
@@ -208,6 +225,7 @@ function AppShell() {
           <Route path="/categories" element={<Categories data={data} />} />
           <Route path="/reports" element={<Reports data={data} />} />
           <Route path="/settings" element={<Settings data={data} />} />
+          <Route path="/installments" element={<Installments data={data} />} />
         </Routes>
       </main>
 
@@ -233,12 +251,13 @@ function AppShell() {
       <style>{`
         .app-layout { display: flex; height: 100vh; overflow: hidden; position: relative; }
         .main-content {
-          flex: 1; overflow-y: auto; overflow-x: hidden;
+          flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
           position: relative; z-index: 1; padding: 28px 28px 40px;
         }
         .page { max-width: 1400px; margin: 0 auto; }
       `}</style>
     </div>
+    </CalendarProvider>
   )
 }
 

@@ -13,10 +13,15 @@ module.exports = {
     output: "release",
   },
   files: ["out/**/*", "!out/**/*.map"],
-  extraResources: [{ from: "src/renderer/assets/finely.png", to: "src/renderer/assets/finely.png" }],
+  extraResources: [
+    {
+      from: "src/renderer/assets/finely.png",
+      to: "src/renderer/assets/finely.png",
+    },
+  ],
   win: {
     target: [
-      { target: "nsis",     arch: ["x64"] },
+      { target: "nsis", arch: ["x64"] },
       { target: "portable", arch: ["x64"] },
     ],
     icon: "src/renderer/assets/finely.png",
@@ -27,9 +32,7 @@ module.exports = {
     deleteAppDataOnUninstall: false,
   },
   linux: {
-    target: [
-      { target: "AppImage", arch: ["x64"] },
-    ],
+    target: [{ target: "AppImage", arch: ["x64"] }],
     icon: "src/renderer/assets/finely.png",
     category: "Office",
     synopsis: "Personal income & expense tracker",

@@ -3,17 +3,12 @@ import { Plus, Pencil, Trash2, Tag } from 'lucide-react'
 import GlassCard from '../components/GlassCard'
 import CategoryIcon, { AVAILABLE_ICONS } from '../components/CategoryIcon'
 import Modal from '../components/Modal'
+import ColorPicker, { DEFAULT_COLOR_PRESETS } from '../components/ColorPicker'
 import type { Category } from '../types'
 import type { UseDataReturn } from '../hooks/useData'
 import { useToast } from '../components/Toast'
 
 interface Props { data: UseDataReturn }
-
-const PRESET_COLORS = [
-  '#4ade80', '#60a5fa', '#fbbf24', '#f472b6', '#a78bfa',
-  '#fb923c', '#38bdf8', '#34d399', '#c084fc', '#f87171',
-  '#818cf8', '#94a3b8', '#e879f9', '#2dd4bf', '#facc15'
-]
 
 function CategoryForm({
   type,
@@ -27,7 +22,7 @@ function CategoryForm({
   onCancel: () => void
 }) {
   const [name, setName] = useState(initial?.name ?? '')
-  const [color, setColor] = useState(initial?.color ?? PRESET_COLORS[0])
+  const [color, setColor] = useState(initial?.color ?? DEFAULT_COLOR_PRESETS[0])
   const [icon, setIcon] = useState(initial?.icon ?? AVAILABLE_ICONS[0])
   const [budget, setBudget] = useState(initial?.budget?.toString() ?? '')
   const [saving, setSaving] = useState(false)
@@ -54,18 +49,7 @@ function CategoryForm({
       </div>
       <div className="form-group">
         <label className="form-label">Color</label>
-        <div className="color-grid">
-          {PRESET_COLORS.map(c => (
-            <button
-              key={c}
-              type="button"
-              className={`color-swatch ${color === c ? 'color-swatch--active' : ''}`}
-              style={{ background: c }}
-              onClick={() => setColor(c)}
-            />
-          ))}
-          <input type="color" value={color} onChange={e => setColor(e.target.value)} title="Custom color" className="color-custom" />
-        </div>
+        <ColorPicker value={color} onChange={setColor} />
       </div>
       <div className="form-group">
         <label className="form-label">Icon</label>
@@ -122,12 +106,7 @@ function CategoryForm({
         .form-group { display: flex; flex-direction: column; gap: 6px; }
         .form-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
         .form-input { user-select: text; }
-        .color-grid { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        .color-swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: transform var(--transition-spring), border-color var(--transition); }
-        .color-swatch--active { border-color: white; transform: scale(1.2); }
-        .color-swatch:hover { transform: scale(1.1); }
-        .color-custom { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--glass-border); padding: 0; cursor: pointer; background: none; overflow: hidden; }
-        .icon-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.icon-grid { display: flex; flex-wrap: wrap; gap: 6px; }
         .icon-btn { width: 34px; height: 34px; border-radius: var(--radius-xs); background: var(--glass-bg); border: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--transition); }
         .icon-btn:hover { background: var(--glass-bg-hover); border-color: var(--glass-border-hover); }
         .icon-btn--active { background: var(--accent-dim); border-color: var(--glass-border-accent); }

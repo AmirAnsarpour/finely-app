@@ -24,6 +24,30 @@ export interface AppSettings {
   theme: 'light' | 'dark' | 'black' | 'system'
   dataFolder: string
   onboardingComplete?: boolean
+  calendarType?: 'gregorian' | 'jalali'
+  weekStartDay?: 0 | 1 | 6   // 0=Sun, 1=Mon, 6=Sat
+}
+
+export interface InstallmentPayment {
+  id: string
+  installmentNumber: number
+  dueDate: string
+  paidDate?: string
+  amount: number
+  isPaid: boolean
+}
+
+export interface Installment {
+  id: string
+  name: string
+  creditor?: string
+  monthlyAmount: number
+  totalInstallments: number
+  startDate: string
+  payments: InstallmentPayment[]
+  notes?: string
+  color: string
+  createdAt: string
 }
 
 export interface MonthlyData {

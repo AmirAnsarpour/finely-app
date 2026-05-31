@@ -7,14 +7,16 @@ import SkeletonRow from '../components/SkeletonRow'
 import { MonthlyBarChart } from '../components/Chart'
 import type { UseDataReturn } from '../hooks/useData'
 import {
-  formatCurrency, getLast6Months, getMonthKey, getMonthLabel,
+  formatCurrency, getLast6Months, getMonthKey,
   currentMonthKey, previousMonthKey
 } from '../utils/formatters'
+import { useCalendar } from '../utils/calendarContext'
 
 interface Props { data: UseDataReturn }
 
 export default function Dashboard({ data }: Props) {
   const { transactions, categories, settings, refreshing } = data
+  const { getMonthLabel } = useCalendar()
 
   const currentMonth = currentMonthKey()
   const lastMonth = useMemo(() => previousMonthKey(currentMonth), [currentMonth])
@@ -40,7 +42,7 @@ export default function Dashboard({ data }: Props) {
       month: getMonthLabel(month),
       income: transactions.filter(t => t.type === 'income' && getMonthKey(t.date) === month).reduce((s, t) => s + t.amount, 0),
       expenses: transactions.filter(t => t.type === 'expense' && getMonthKey(t.date) === month).reduce((s, t) => s + t.amount, 0)
-    })), [transactions])
+    })), [transactions, getMonthLabel])
 
   const recentTransactions = useMemo(() =>
     [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10),

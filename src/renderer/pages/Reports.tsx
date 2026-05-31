@@ -5,9 +5,10 @@ import { MonthlyBarChart, ExpensePieChart, DailySpendingChart } from '../compone
 import CategoryIcon from '../components/CategoryIcon'
 import type { UseDataReturn } from '../hooks/useData'
 import {
-  formatCurrency, formatDateShort, getMonthKey, getMonthLabel,
+  formatCurrency, getMonthKey,
   getLast12Months, previousMonthKey
 } from '../utils/formatters'
+import { useCalendar } from '../utils/calendarContext'
 import { useToast } from '../components/Toast'
 
 interface Props { data: UseDataReturn }
@@ -27,6 +28,7 @@ function DeltaBadge({ cur, prev, goodIfPositive }: { cur: number; prev: number; 
 export default function Reports({ data }: Props) {
   const { transactions, categories, settings, exportCSV } = data
   const { toast } = useToast()
+  const { formatDateShort, getMonthLabel } = useCalendar()
 
   const months = getLast12Months()
   const [selectedMonth, setSelectedMonth] = useState(months[months.length - 1])
@@ -104,7 +106,7 @@ export default function Reports({ data }: Props) {
       month: getMonthLabel(month),
       income:   transactions.filter(t => t.type === 'income'  && getMonthKey(t.date) === month).reduce((s, t) => s + t.amount, 0),
       expenses: transactions.filter(t => t.type === 'expense' && getMonthKey(t.date) === month).reduce((s, t) => s + t.amount, 0)
-    })), [transactions, months])
+    })), [transactions, months, getMonthLabel])
 
   // ── Budget tracker ───────────────────────────────────────
   const budgetItems = useMemo(() =>

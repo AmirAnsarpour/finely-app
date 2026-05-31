@@ -1,6 +1,12 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronLeft, ChevronRight, ChevronDown, Calendar, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, X } from 'lucide-react'
+import { useCalendar } from '../utils/calendarContext'
+import {
+  isoToJalali, jalaliToISO,
+  jalaliMonthLength, jalaliMonthStartDow,
+  JALALI_MONTHS, JALALI_WDAY_SHORT
+} from '../utils/jalali'
 
 interface Props {
   value: string        // 'YYYY-MM-DD' or ''
@@ -10,50 +16,98 @@ interface Props {
   clearable?: boolean
 }
 
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
-const WDAYS  = ['Su','Mo','Tu','We','Th','Fr','Sa']
+const GREG_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+// Indexed by JS getDay() (0=Sun…6=Sat)
+const GREG_WDAY  = ['Su','Mo','Tu','We','Th','Fr','Sa']
 
 function pad(n: number) { return String(n).padStart(2, '0') }
-function toISO(y: number, m: number, d: number) { return `${y}-${pad(m + 1)}-${pad(d)}` }
+function isoOf(y: number, m: number, d: number) { return `${y}-${pad(m)}-${pad(d)}` }
 
-function buildGrid(year: number, month: number): (number | null)[] {
-  const firstDay = new Date(year, month, 1).getDay()
-  const total    = new Date(year, month + 1, 0).getDate()
-  const cells: (number | null)[] = Array(firstDay).fill(null)
+// ── grid helpers ──────────────────────────────────────────────
+
+function buildGregGrid(vy: number, vm0: number, startDay: number): (number | null)[] {
+  // vm0 is 0-indexed (JS month)
+  const firstDow = new Date(vy, vm0, 1).getDay()
+  const total    = new Date(vy, vm0 + 1, 0).getDate()
+  const offset   = (firstDow - startDay + 7) % 7
+  const cells: (number | null)[] = Array(offset).fill(null)
   for (let d = 1; d <= total; d++) cells.push(d)
   while (cells.length % 7 !== 0) cells.push(null)
   return cells
 }
 
-function fmtDisplay(iso: string) {
-  const [y, m, d] = iso.split('-').map(Number)
-  return `${MONTHS[m - 1].slice(0, 3)} ${d}, ${y}`
+function buildJalaliGrid(jy: number, jm: number, startDay: number): (number | null)[] {
+  const firstDow = jalaliMonthStartDow(jy, jm)
+  const total    = jalaliMonthLength(jy, jm)
+  const offset   = (firstDow - startDay + 7) % 7
+  const cells: (number | null)[] = Array(offset).fill(null)
+  for (let d = 1; d <= total; d++) cells.push(d)
+  while (cells.length % 7 !== 0) cells.push(null)
+  return cells
 }
 
-export default function DatePicker({ value, onChange, max, placeholder = 'Select date…', clearable = false }: Props) {
-  const now = new Date()
-  const todayISO = toISO(now.getFullYear(), now.getMonth(), now.getDate())
+function wdayHeaders(calType: 'gregorian' | 'jalali', startDay: number): string[] {
+  const src = calType === 'jalali' ? JALALI_WDAY_SHORT : GREG_WDAY
+  return Array.from({ length: 7 }, (_, i) => src[(startDay + i) % 7])
+}
 
-  const [open, setOpen] = useState(false)
-  const [vy, setVy] = useState(() => value ? +value.slice(0, 4) : now.getFullYear())
-  const [vm, setVm] = useState(() => value ? +value.slice(5, 7) - 1 : now.getMonth())
+// ── trigger display ───────────────────────────────────────────
+
+function fmtDisplay(iso: string, calType: 'gregorian' | 'jalali'): string {
+  if (calType === 'jalali') {
+    const [jy, jm, jd] = isoToJalali(iso)
+    return `${jd} ${JALALI_MONTHS[jm - 1]} ${jy}`
+  }
+  const [y, m, d] = iso.split('-').map(Number)
+  return `${GREG_MONTHS[m - 1].slice(0, 3)} ${d}, ${y}`
+}
+
+function fmtMonthHeading(vy: number, vm: number, calType: 'gregorian' | 'jalali'): string {
+  if (calType === 'jalali') return `${JALALI_MONTHS[vm - 1]} ${vy}`
+  return `${GREG_MONTHS[vm - 1]} ${vy}`
+}
+
+// ── component ─────────────────────────────────────────────────
+
+export default function DatePicker({ value, onChange, max, placeholder = 'Select date…', clearable = false }: Props) {
+  const { calendarType, weekStartDay } = useCalendar()
+  const isJalali = calendarType === 'jalali'
+  const now = new Date()
+  const todayISO = isoOf(now.getFullYear(), now.getMonth() + 1, now.getDate())
+
+  // ── navigation state (vy, vm are 1-indexed for both calendars) ──
+  function initView(): [number, number] {
+    const src = value || todayISO
+    if (isJalali) {
+      const [jy, jm] = isoToJalali(src)
+      return [jy, jm]
+    }
+    const [y, m] = src.split('-').map(Number)
+    return [y, m]
+  }
+
+  const [open,     setOpen]     = useState(false)
+  const [[vy, vm], setView]     = useState<[number,number]>(initView)
   const [slideKey, setSlideKey] = useState(0)
-  const [slideDir, setSlideDir] = useState<'left' | 'right'>('left')
+  const [slideDir, setSlideDir] = useState<'left'|'right'>('left')
   const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({})
 
   const triggerRef = useRef<HTMLButtonElement>(null)
   const panelRef   = useRef<HTMLDivElement>(null)
 
+  // Re-sync view when value or calendarType changes
+  useEffect(() => {
+    if (!open) setView(initView())
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, calendarType])
+
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return
     const r = triggerRef.current.getBoundingClientRect()
-    const panelW = 272
-    const panelH = 316
+    const panelW = 272, panelH = 316
     const spaceBelow = window.innerHeight - r.bottom - 8
     const openUp = spaceBelow < panelH && r.top > panelH
-    // Clamp left so panel never overflows right edge
     const leftPos = Math.min(r.left, window.innerWidth - panelW - 8)
-
     setPanelStyle(
       openUp
         ? { position: 'fixed', bottom: window.innerHeight - r.top + 6, left: leftPos, zIndex: 9999 }
@@ -85,14 +139,36 @@ export default function DatePicker({ value, onChange, max, placeholder = 'Select
   function navigate(dir: 'prev' | 'next') {
     setSlideDir(dir === 'next' ? 'left' : 'right')
     setSlideKey(k => k + 1)
-    if (dir === 'prev') { if (vm === 0) { setVy(y => y - 1); setVm(11) } else setVm(m => m - 1) }
-    else                { if (vm === 11) { setVy(y => y + 1); setVm(0) } else setVm(m => m + 1) }
+    setView(([y, m]) => {
+      if (dir === 'prev') return m === 1 ? [y - 1, 12] : [y, m - 1]
+      return m === 12 ? [y + 1, 1] : [y, m + 1]
+    })
   }
 
-  const maxYM = max ? max.slice(0, 7) : null
-  const canNext = !maxYM || `${vy}-${pad(vm + 1)}` < maxYM
+  // ── max-month guard ───────────────────────────────────────────
+  function isAfterMax(y: number, m: number): boolean {
+    if (!max) return false
+    if (isJalali) {
+      const [my, mm] = isoToJalali(max)
+      return y > my || (y === my && m > mm)
+    }
+    return y > +max.slice(0, 4) || (y === +max.slice(0, 4) && m > +max.slice(5, 7))
+  }
+  const canNext = !isAfterMax(vm === 12 ? vy + 1 : vy, vm === 12 ? 1 : vm + 1)
 
-  const cells = buildGrid(vy, vm)
+  // ── grid ───────────────────────────────────────────────────────
+  const cells = isJalali
+    ? buildJalaliGrid(vy, vm, weekStartDay)
+    : buildGregGrid(vy, vm - 1, weekStartDay)  // Gregorian: vm is 1-indexed here
+
+  // ── cell → ISO ────────────────────────────────────────────────
+  function cellISO(day: number): string {
+    return isJalali
+      ? jalaliToISO(vy, vm, day)
+      : isoOf(vy, vm, day)
+  }
+
+  const wdays = wdayHeaders(calendarType, weekStartDay)
 
   return (
     <div className="dp-wrap">
@@ -102,8 +178,14 @@ export default function DatePicker({ value, onChange, max, placeholder = 'Select
         className={`dp-trigger ${open ? 'dp-trigger--open' : ''}`}
         onClick={() => setOpen(v => !v)}
       >
-        <Calendar size={13} className="dp-cal-icon" />
-        <span className={value ? 'dp-val' : 'dp-ph'}>{value ? fmtDisplay(value) : placeholder}</span>
+        <span className="dp-cal-icon-wrap">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="dp-cal-icon">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </span>
+        <span className={value ? 'dp-val' : 'dp-ph'}>
+          {value ? fmtDisplay(value, calendarType) : placeholder}
+        </span>
         {clearable && value
           ? <span className="dp-clear" onClick={e => { e.stopPropagation(); onChange(''); setOpen(false) }}>
               <X size={12} />
@@ -114,27 +196,24 @@ export default function DatePicker({ value, onChange, max, placeholder = 'Select
 
       {open && createPortal(
         <div ref={panelRef} className="dp-panel" style={panelStyle}>
-          {/* Month navigation */}
           <div className="dp-nav">
             <button type="button" className="dp-navbtn" onClick={() => navigate('prev')}>
               <ChevronLeft size={14} />
             </button>
-            <span className="dp-month">{MONTHS[vm]} {vy}</span>
+            <span className="dp-month">{fmtMonthHeading(vy, vm, calendarType)}</span>
             <button type="button" className="dp-navbtn" onClick={() => navigate('next')} disabled={!canNext}>
               <ChevronRight size={14} />
             </button>
           </div>
 
-          {/* Weekday headers */}
           <div className="dp-weekrow">
-            {WDAYS.map(d => <span key={d} className="dp-wday">{d}</span>)}
+            {wdays.map((d, i) => <span key={i} className="dp-wday">{d}</span>)}
           </div>
 
-          {/* Day grid — key forces remount = animation replays on navigate */}
           <div key={slideKey} className={`dp-daygrid ${slideDir === 'left' ? 'dp-slide-l' : 'dp-slide-r'}`}>
             {cells.map((day, i) => {
               if (day === null) return <span key={`e${i}`} />
-              const iso      = toISO(vy, vm, day)
+              const iso      = cellISO(day)
               const disabled = !!max && iso > max
               const isToday  = iso === todayISO
               const isSel    = iso === value
@@ -173,7 +252,8 @@ export default function DatePicker({ value, onChange, max, placeholder = 'Select
           background: var(--glass-bg-hover);
           box-shadow: 0 0 0 3px var(--accent-glow);
         }
-        .dp-cal-icon { color: var(--text-muted); flex-shrink: 0; }
+        .dp-cal-icon-wrap { display: flex; align-items: center; flex-shrink: 0; }
+        .dp-cal-icon { color: var(--text-muted); }
         .dp-val { flex: 1; font-size: 14px; color: var(--text-primary); }
         .dp-ph  { flex: 1; font-size: 14px; color: var(--text-muted); }
         .dp-chevron { color: var(--text-muted); flex-shrink: 0; transition: transform 0.24s var(--ease-spring); }
@@ -247,13 +327,11 @@ export default function DatePicker({ value, onChange, max, placeholder = 'Select
         [data-theme='light'] .dp-day:hover:not(:disabled):not(.dp-sel) {
           background: rgba(108,142,245,0.1);
         }
-        /* Today: accent text + small dot below */
         .dp-today:not(.dp-sel) { color: var(--accent); font-weight: 600; }
         .dp-today:not(.dp-sel)::after {
           content: ''; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%);
           width: 3px; height: 3px; border-radius: 50%; background: var(--accent);
         }
-        /* Selected: filled accent circle */
         .dp-sel {
           background: var(--accent); color: white; font-weight: 700;
           border-radius: 50%;

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react'
+import ReactDOM from 'react-dom'
 import { X } from 'lucide-react'
 
 interface ModalProps {
@@ -20,7 +21,7 @@ export default function Modal({ open, onClose, title, children, width = 480 }: M
 
   if (!open) return null
 
-  return (
+  return ReactDOM.createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div
         className="modal-content"
@@ -43,9 +44,11 @@ export default function Modal({ open, onClose, title, children, width = 480 }: M
           background: rgba(0, 0, 0, 0.6);
           backdrop-filter: blur(4px);
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           justify-content: center;
           z-index: 100;
+          overflow-y: auto;
+          padding: 40px 20px;
         }
         .modal-content {
           background: rgba(8, 8, 10, 0.97);
@@ -55,6 +58,8 @@ export default function Modal({ open, onClose, title, children, width = 480 }: M
           border-radius: var(--radius-xl);
           box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.1);
           overflow: hidden;
+          margin: auto 0;
+          flex-shrink: 0;
         }
         [data-theme='light'] .modal-content {
           background: rgba(245, 248, 255, 0.96);
@@ -93,6 +98,7 @@ export default function Modal({ open, onClose, title, children, width = 480 }: M
           padding: 20px 24px 24px;
         }
       `}</style>
-    </div>
+    </div>,
+    document.body
   )
 }

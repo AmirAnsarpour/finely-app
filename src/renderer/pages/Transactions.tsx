@@ -9,7 +9,8 @@ import Modal from '../components/Modal'
 import type { Transaction } from '../types'
 import type { UseDataReturn } from '../hooks/useData'
 import { useToast } from '../components/Toast'
-import { formatCurrency, formatDate, todayString, yesterdayString } from '../utils/formatters'
+import { formatCurrency, todayString, yesterdayString } from '../utils/formatters'
+import { useCalendar } from '../utils/calendarContext'
 
 interface Props { data: UseDataReturn }
 
@@ -25,7 +26,7 @@ function usePersistedState<T>(key: string, initial: T) {
 
 type TxGroup = { label: string; date: string; items: Transaction[] }
 
-function groupByDate(txs: Transaction[]): TxGroup[] {
+function groupByDate(txs: Transaction[], formatDate: (iso: string) => string): TxGroup[] {
   const today = todayString()
   const yesterday = yesterdayString()
   const map = new Map<string, Transaction[]>()
@@ -43,6 +44,7 @@ function groupByDate(txs: Transaction[]): TxGroup[] {
 export default function Transactions({ data }: Props) {
   const { transactions, categories, settings, updateTransaction, deleteTransaction, exportCSV, refreshing } = data
   const { toast } = useToast()
+  const { formatDate } = useCalendar()
 
   const [search, setSearch] = usePersistedState('finely-tx-search', '')
   const [typeFilter, setTypeFilter] = usePersistedState<'all' | 'income' | 'expense'>('finely-tx-type', 'all')
@@ -81,7 +83,7 @@ export default function Transactions({ data }: Props) {
   useEffect(() => { setVisibleCount(15) }, [search, typeFilter, categoryFilter, dateFrom, dateTo])
 
   const visibleFiltered = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount])
-  const groups = useMemo(() => groupByDate(visibleFiltered), [visibleFiltered])
+  const groups = useMemo(() => groupByDate(visibleFiltered, formatDate), [visibleFiltered, formatDate])
   const hasMore = filtered.length > visibleCount
 
   const totalIncome = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)

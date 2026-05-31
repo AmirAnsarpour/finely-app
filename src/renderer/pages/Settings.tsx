@@ -1,5 +1,11 @@
 import React, { useState } from "react";
-import { FolderOpen, Upload, Download, Github, ExternalLink } from "lucide-react";
+import {
+  FolderOpen,
+  Upload,
+  Download,
+  Github,
+  ExternalLink,
+} from "lucide-react";
 import Select from "../components/Select";
 import GlassCard from "../components/GlassCard";
 import type { UseDataReturn } from "../hooks/useData";
@@ -27,6 +33,16 @@ export default function Settings({ data }: Props) {
       currencyLocale: cur.locale,
     });
     toast("Currency updated");
+  };
+
+  const handleCalendarTypeChange = async (val: string) => {
+    await updateSettings({ calendarType: val as "gregorian" | "jalali" });
+    toast("Calendar updated");
+  };
+
+  const handleWeekStartChange = async (val: string) => {
+    await updateSettings({ weekStartDay: parseInt(val) as 0 | 1 | 6 });
+    toast("Week start updated");
   };
 
   const handleThemeChange = async (theme: string) => {
@@ -101,6 +117,49 @@ export default function Settings({ data }: Props) {
                     { value: "dark", label: "  Dark" },
                     { value: "black", label: "  Black" },
                     { value: "system", label: "  System" },
+                  ]}
+                />
+              </div>
+            </div>
+          </div>
+        </GlassCard>
+
+        {/* Calendar */}
+        <GlassCard className="card-appear">
+          <h2 className="section-title">Calendar</h2>
+          <p className="section-sub">Date display format and week layout</p>
+          <div className="settings-section">
+            <div className="setting-row">
+              <div>
+                <p className="setting-name">Calendar Type</p>
+                <p className="setting-desc">
+                  Gregorian (international) or Jalali (Persian / شمسی)
+                </p>
+              </div>
+              <div style={{ minWidth: 200 }}>
+                <Select
+                  value={settings.calendarType ?? "gregorian"}
+                  onChange={handleCalendarTypeChange}
+                  options={[
+                    { value: "gregorian", label: "Gregorian" },
+                    { value: "jalali", label: "Jalali" },
+                  ]}
+                />
+              </div>
+            </div>
+            <div className="setting-row">
+              <div>
+                <p className="setting-name">First Day of Week</p>
+                <p className="setting-desc">The day your week starts on</p>
+              </div>
+              <div style={{ minWidth: 160 }}>
+                <Select
+                  value={String(settings.weekStartDay ?? 0)}
+                  onChange={handleWeekStartChange}
+                  options={[
+                    { value: "6", label: "Saturday" },
+                    { value: "0", label: "Sunday" },
+                    { value: "1", label: "Monday" },
                   ]}
                 />
               </div>
@@ -242,7 +301,11 @@ export default function Settings({ data }: Props) {
             <div className="about-links">
               <button
                 className="about-link-btn"
-                onClick={() => window.electronAPI.openExternal('https://github.com/AmirAnsarpour/finely-app')}
+                onClick={() =>
+                  window.electronAPI.openExternal(
+                    "https://github.com/AmirAnsarpour/finely-app",
+                  )
+                }
               >
                 <Github size={15} />
                 <span>GitHub Repository</span>
@@ -250,7 +313,11 @@ export default function Settings({ data }: Props) {
               </button>
               <button
                 className="about-link-btn"
-                onClick={() => window.electronAPI.openExternal('https://github.com/AmirAnsarpour')}
+                onClick={() =>
+                  window.electronAPI.openExternal(
+                    "https://github.com/AmirAnsarpour",
+                  )
+                }
               >
                 <Github size={15} />
                 <span>Developer Profile</span>
