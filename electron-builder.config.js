@@ -16,7 +16,8 @@ module.exports = {
   extraResources: [{ from: "src/renderer/assets/finely.png", to: "src/renderer/assets/finely.png" }],
   win: {
     target: [
-      { target: "nsis", arch: ["x64"] },
+      { target: "nsis",     arch: ["x64"] },
+      { target: "portable", arch: ["x64"] },
     ],
     icon: "src/renderer/assets/finely.png",
   },
