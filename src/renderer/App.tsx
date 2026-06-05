@@ -7,15 +7,19 @@ import Categories from './pages/Categories'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import Installments from './pages/Installments'
+import Goals from './pages/Goals'
 import Modal from './components/Modal'
 import TransactionForm from './pages/TransactionForm'
 import { useData } from './hooks/useData'
 import { ToastProvider, useToast } from './components/Toast'
 import { CalendarProvider } from './utils/calendarContext'
-import { CURRENCIES, currentMonthKey, getMonthKey } from './utils/formatters'
+import { CURRENCIES } from './utils/formatters'
+import { useCalendar } from './utils/calendarContext'
 import logoUrl from './assets/finely.png'
 import './styles/globals.css'
 import './styles/animations.css'
+import './styles/components.css'
+import './styles/pages.css'
 
 // ── Onboarding ────────────────────────────────────────────
 function Onboarding({ onComplete }: { onComplete: (currency: string) => void }) {
@@ -104,6 +108,7 @@ function CloseConfirm({ onDiscard, onKeep }: { onDiscard: () => void; onKeep: ()
 function AppShell() {
   const data = useData()
   const { toast } = useToast()
+  const { getMonthKey, currentMonthKey } = useCalendar()
   const [showAddModal, setShowAddModal] = useState(false)
   const [formDirty, setFormDirty] = useState(false)
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
@@ -138,7 +143,7 @@ function AppShell() {
           .reduce((s, t) => s + t.amount, 0)
         return spent >= c.budget! * 0.8
       }).length
-  }, [data.categories, data.transactions])
+  }, [data.categories, data.transactions, getMonthKey, currentMonthKey])
 
   // Ctrl+N shortcut
   useEffect(() => {
@@ -226,6 +231,7 @@ function AppShell() {
           <Route path="/reports" element={<Reports data={data} />} />
           <Route path="/settings" element={<Settings data={data} />} />
           <Route path="/installments" element={<Installments data={data} />} />
+          <Route path="/goals" element={<Goals data={data} />} />
         </Routes>
       </main>
 
@@ -237,6 +243,7 @@ function AppShell() {
           <TransactionForm
             categories={data.categories}
             settings={data.settings}
+            transactions={data.transactions}
             onDirtyChange={setFormDirty}
             onSave={async (tx) => {
               await data.addTransaction(tx)

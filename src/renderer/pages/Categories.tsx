@@ -4,6 +4,7 @@ import GlassCard from '../components/GlassCard'
 import CategoryIcon, { AVAILABLE_ICONS } from '../components/CategoryIcon'
 import Modal from '../components/Modal'
 import ColorPicker, { DEFAULT_COLOR_PRESETS } from '../components/ColorPicker'
+import { normalizeDigits } from '../utils/numerals'
 import type { Category } from '../types'
 import type { UseDataReturn } from '../hooks/useData'
 import { useToast } from '../components/Toast'
@@ -73,12 +74,11 @@ function CategoryForm({
           <label className="form-label">Monthly Budget <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
           <input
             className="form-input"
-            type="number"
-            min="0"
-            step="0.01"
+            type="text"
+            inputMode="decimal"
             placeholder="e.g. 500"
             value={budget}
-            onChange={e => setBudget(e.target.value)}
+            onChange={e => setBudget(normalizeDigits(e.target.value))}
           />
         </div>
       )}
@@ -101,24 +101,6 @@ function CategoryForm({
         </button>
       </div>
 
-      <style>{`
-        .cat-form { display: flex; flex-direction: column; gap: 16px; }
-        .form-group { display: flex; flex-direction: column; gap: 6px; }
-        .form-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
-        .form-input { user-select: text; }
-.icon-grid { display: flex; flex-wrap: wrap; gap: 6px; }
-        .icon-btn { width: 34px; height: 34px; border-radius: var(--radius-xs); background: var(--glass-bg); border: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--transition); }
-        .icon-btn:hover { background: var(--glass-bg-hover); border-color: var(--glass-border-hover); }
-        .icon-btn--active { background: var(--accent-dim); border-color: var(--glass-border-accent); }
-        .cat-preview { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); }
-        .form-error { font-size: 12px; color: var(--expense); background: var(--expense-dim); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid rgba(248,113,113,0.25); }
-        .form-actions { display: flex; gap: 10px; justify-content: flex-end; padding-top: 4px; }
-        .btn-primary { padding: 10px 20px; border-radius: var(--radius-md); background: var(--accent); color: white; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: background var(--transition), opacity var(--transition); }
-        .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-        .btn-ghost { padding: 10px 20px; border-radius: var(--radius-md); background: var(--glass-bg); color: var(--text-secondary); font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid var(--glass-border); transition: background var(--transition), color var(--transition); }
-        .btn-ghost:hover { background: var(--glass-bg-hover); color: var(--text-primary); }
-      `}</style>
     </form>
   )
 }
@@ -168,7 +150,7 @@ function CategoryList({
               <CategoryIcon icon={c.icon} color={c.color} size={16} showBg bgSize={36} />
               <span className="cat-item__name">{c.name}</span>
               {c.budget && c.budget > 0 && (
-                <span className="cat-item__budget">Budget: {c.budget.toLocaleString()}</span>
+                <span className="cat-item__budget">Budget: {c.budget.toLocaleString('en-US')}</span>
               )}
               <div className="cat-item__actions">
                 <button className="icon-action" onClick={() => onEdit(c)} title="Edit">
@@ -183,23 +165,6 @@ function CategoryList({
         )}
       </div>
 
-      <style>{`
-        .cat-list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-        .section-title { font-size: 15px; font-weight: 600; }
-        .section-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-        .btn-sm { display: flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: var(--radius-sm); background: transparent; border: 1px solid var(--glass-border); font-size: 13px; font-weight: 500; cursor: pointer; transition: background var(--transition), color var(--transition); }
-        .btn-sm:hover { background: var(--glass-bg); }
-        .cat-items { display: flex; flex-direction: column; gap: 6px; }
-        .cat-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--glass-bg); border: 1px solid var(--glass-border); transition: background var(--transition), border-color var(--transition); }
-        .cat-item:hover { background: var(--glass-bg-hover); border-color: var(--glass-border-hover); }
-        .cat-item:hover .cat-item__actions { opacity: 1; pointer-events: all; }
-        .cat-item__name { flex: 1; font-size: 14px; font-weight: 500; color: var(--text-primary); }
-        .cat-item__budget { font-size: 11px; color: var(--text-muted); background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 20px; padding: 2px 8px; white-space: nowrap; }
-        .cat-item__actions { display: flex; gap: 4px; opacity: 0; pointer-events: none; transition: opacity var(--transition); }
-        .icon-action { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: var(--radius-xs); background: transparent; border: 1px solid var(--glass-border); color: var(--text-muted); cursor: pointer; transition: all var(--transition); }
-        .icon-action:hover { background: var(--glass-bg-hover); color: var(--text-primary); }
-        .icon-action--danger:hover { background: var(--expense-dim); color: var(--expense); border-color: rgba(248,113,113,0.3); }
-      `}</style>
     </GlassCard>
   )
 }
@@ -292,21 +257,6 @@ export default function Categories({ data }: Props) {
         </div>
       </Modal>
 
-      <style>{`
-        .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; gap: 12px; flex-wrap: wrap; }
-        .page-title {
-          font-size: 26px; font-weight: 700; letter-spacing: -0.5px;
-          background: linear-gradient(135deg, #e8eaff 0%, rgba(255,255,255,0.65) 100%);
-          -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-        }
-        .page-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
-        .cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        @media (max-width: 800px) { .cat-grid { grid-template-columns: 1fr; } }
-        .btn-ghost { padding: 10px 20px; border-radius: var(--radius-md); background: var(--glass-bg); color: var(--text-secondary); font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid var(--glass-border); transition: background var(--transition), color var(--transition); }
-        .btn-ghost:hover { background: var(--glass-bg-hover); color: var(--text-primary); }
-        .btn-danger { padding: 10px 20px; border-radius: var(--radius-md); background: var(--expense-dim); color: var(--expense); font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid rgba(248,113,113,0.3); transition: all var(--transition); }
-        .btn-danger:hover { background: rgba(248,113,113,0.2); }
-      `}</style>
     </div>
   )
 }

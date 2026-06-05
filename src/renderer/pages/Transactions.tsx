@@ -11,18 +11,9 @@ import type { UseDataReturn } from '../hooks/useData'
 import { useToast } from '../components/Toast'
 import { formatCurrency, todayString, yesterdayString } from '../utils/formatters'
 import { useCalendar } from '../utils/calendarContext'
+import { useSessionState } from '../hooks/useSessionState'
 
 interface Props { data: UseDataReturn }
-
-// Persist filter state across navigation
-function usePersistedState<T>(key: string, initial: T) {
-  const [state, setState] = useState<T>(() => {
-    const saved = sessionStorage.getItem(key)
-    return saved !== null ? (JSON.parse(saved) as T) : initial
-  })
-  useEffect(() => { sessionStorage.setItem(key, JSON.stringify(state)) }, [key, state])
-  return [state, setState] as const
-}
 
 type TxGroup = { label: string; date: string; items: Transaction[] }
 
@@ -46,11 +37,12 @@ export default function Transactions({ data }: Props) {
   const { toast } = useToast()
   const { formatDate } = useCalendar()
 
-  const [search, setSearch] = usePersistedState('finely-tx-search', '')
-  const [typeFilter, setTypeFilter] = usePersistedState<'all' | 'income' | 'expense'>('finely-tx-type', 'all')
-  const [categoryFilter, setCategoryFilter] = usePersistedState('finely-tx-cat', '')
-  const [dateFrom, setDateFrom] = usePersistedState('finely-tx-from', '')
-  const [dateTo, setDateTo] = usePersistedState('finely-tx-to', '')
+  const [search, setSearch] = useSessionState('finely-tx-search', '')
+  const [typeFilter, setTypeFilter] = useSessionState<'all' | 'income' | 'expense'>('finely-tx-type', 'all')
+  const [categoryFilter, setCategoryFilter] = useSessionState('finely-tx-cat', '')
+  const [dateFrom, setDateFrom] = useSessionState('finely-tx-from', '')
+  const [dateTo, setDateTo] = useSessionState('finely-tx-to', '')
+  const [tagFilter, setTagFilter] = useSessionState('finely-tx-tag', '')
 
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
@@ -62,11 +54,16 @@ export default function Transactions({ data }: Props) {
     typeFilter === 'all' ? categories : categories.filter(c => c.type === typeFilter),
     [categories, typeFilter])
 
+  const allTags = useMemo(() =>
+    [...new Set(transactions.flatMap(t => t.tags ?? []))].sort(),
+    [transactions])
+
   const filtered = useMemo(() => {
     return transactions
       .filter(t => {
         if (typeFilter !== 'all' && t.type !== typeFilter) return false
         if (categoryFilter && t.category !== categoryFilter) return false
+        if (tagFilter && !t.tags?.includes(tagFilter)) return false
         if (dateFrom && t.date < dateFrom) return false
         if (dateTo && t.date > dateTo) return false
         if (search) {
@@ -77,10 +74,10 @@ export default function Transactions({ data }: Props) {
         return true
       })
       .sort((a, b) => b.date.localeCompare(a.date))
-  }, [transactions, typeFilter, categoryFilter, dateFrom, dateTo, search, categories])
+  }, [transactions, typeFilter, categoryFilter, tagFilter, dateFrom, dateTo, search, categories])
 
   // Reset pagination whenever filters change
-  useEffect(() => { setVisibleCount(15) }, [search, typeFilter, categoryFilter, dateFrom, dateTo])
+  useEffect(() => { setVisibleCount(15) }, [search, typeFilter, categoryFilter, tagFilter, dateFrom, dateTo])
 
   const visibleFiltered = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount])
   const groups = useMemo(() => groupByDate(visibleFiltered, formatDate), [visibleFiltered, formatDate])
@@ -114,7 +111,7 @@ export default function Transactions({ data }: Props) {
   }
 
   const fmt = (n: number) => formatCurrency(n, settings.currencySymbol, settings.currencyLocale)
-  const hasFilters = search || typeFilter !== 'all' || categoryFilter || dateFrom || dateTo
+  const hasFilters = search || typeFilter !== 'all' || categoryFilter || tagFilter || dateFrom || dateTo
 
   return (
     <div className="page page-enter">
@@ -126,7 +123,7 @@ export default function Transactions({ data }: Props) {
         <div className="page-header-actions">
           {hasFilters && (
             <button className="btn-clear" onClick={() => {
-              setSearch(''); setTypeFilter('all'); setCategoryFilter(''); setDateFrom(''); setDateTo('')
+              setSearch(''); setTypeFilter('all'); setCategoryFilter(''); setTagFilter(''); setDateFrom(''); setDateTo('')
             }}>
               Clear filters
             </button>
@@ -178,6 +175,19 @@ export default function Transactions({ data }: Props) {
             ))}
           </div>
         )}
+
+        {/* Tag chips */}
+        {allTags.length > 0 && (
+          <div className="cat-chips" style={{ paddingTop: chipCategories.length > 0 ? 4 : 2 }}>
+            {allTags.map(tag => (
+              <button key={tag}
+                className={`cat-chip ${tagFilter === tag ? 'cat-chip--active' : ''}`}
+                onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}>
+                #{tag}
+              </button>
+            ))}
+          </div>
+        )}
       </GlassCard>
 
       {/* Totals bar */}
@@ -203,9 +213,15 @@ export default function Transactions({ data }: Props) {
       ) : groups.length === 0 ? (
         <GlassCard padding="md" className="card-appear">
           <div className="empty-state">
-            <ArrowLeftRight size={40} color="var(--text-muted)" />
-            <p>{transactions.length === 0 ? 'No transactions yet' : 'No results found'}</p>
-            <span>{transactions.length === 0 ? 'Add one from the sidebar (or Ctrl+N)' : 'Try adjusting filters'}</span>
+            <div className="tx-empty-ring">
+              <ArrowLeftRight size={22} color={transactions.length === 0 ? 'var(--accent)' : 'var(--text-muted)'} />
+            </div>
+            <p className="empty-title">{transactions.length === 0 ? 'No transactions yet' : 'No results found'}</p>
+            <span className="empty-sub">
+              {transactions.length === 0
+                ? <span>Press <kbd className="tx-kbd">Ctrl N</kbd> to record your first transaction</span>
+                : 'Try clearing or adjusting the filters above'}
+            </span>
           </div>
         </GlassCard>
       ) : (
@@ -249,59 +265,6 @@ export default function Transactions({ data }: Props) {
         </div>
       </Modal>
 
-      <style>{`
-        .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
-        .page-header-actions { display: flex; align-items: center; gap: 8px; }
-        .page-title {
-          font-size: 26px; font-weight: 700; letter-spacing: -0.5px;
-          background: linear-gradient(135deg, #e8eaff 0%, rgba(255,255,255,0.65) 100%);
-          -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-        }
-        .page-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
-        .btn-clear { padding: 6px 12px; border-radius: var(--radius-sm); background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-muted); font-size: 12px; cursor: pointer; transition: all var(--transition); }
-        .btn-clear:hover { color: var(--text-primary); border-color: var(--glass-border-hover); }
-        .btn-export { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--radius-sm); background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; transition: all var(--transition); }
-        .btn-export:hover:not(:disabled) { background: var(--glass-bg-hover); color: var(--text-primary); border-color: var(--glass-border-hover); }
-        .btn-export:disabled { opacity: 0.4; cursor: not-allowed; }
-
-        .filter-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
-        .search-wrap { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 180px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 7px 11px; transition: border-color var(--transition), box-shadow var(--transition); }
-        .search-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
-        .search-input { flex: 1; background: transparent; border: none; padding: 0; font-size: 13px; color: var(--text-primary); outline: none; box-shadow: none; }
-        .type-pills { display: flex; gap: 4px; }
-        .pill { padding: 6px 11px; border-radius: var(--radius-sm); background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; transition: all var(--transition); white-space: nowrap; }
-        .pill--active { background: var(--accent-dim); color: var(--accent); border-color: var(--glass-border-accent); }
-        .pill.income.pill--active { background: var(--income-dim); color: var(--income); border-color: rgba(74,222,128,0.3); }
-        .pill.expense.pill--active { background: var(--expense-dim); color: var(--expense); border-color: rgba(248,113,113,0.3); }
-        .filter-date-wrap { width: 148px; flex-shrink: 0; }
-
-        .cat-chips { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 2px; }
-        .cat-chip { display: flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; transition: all var(--transition); white-space: nowrap; }
-        .cat-chip:hover { background: var(--glass-bg-hover); color: var(--text-primary); }
-        .cat-chip--active { background: var(--glass-bg-hover); color: var(--text-primary); border-color: var(--glass-border-hover); }
-        .chip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-
-        .totals-row { display: flex; gap: 12px; align-items: center; font-size: 13px; font-weight: 500; margin-bottom: 12px; }
-        .totals-sep { width: 1px; height: 14px; background: var(--glass-border); }
-
-        .groups-list { display: flex; flex-direction: column; gap: 20px; max-height: calc(100vh - 320px); overflow-y: auto; padding-right: 2px; padding-bottom: 4px; }
-        .load-more-btn { width: 100%; padding: 11px; border-radius: var(--radius-md); background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer; transition: all var(--transition); }
-        .load-more-btn:hover { background: var(--glass-bg-hover); color: var(--text-primary); border-color: var(--glass-border-hover); }
-        .date-group {}
-        .date-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 0 2px; }
-        .date-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
-        .date-count { font-size: 11px; color: var(--text-muted); }
-        .date-items { display: flex; flex-direction: column; gap: 6px; }
-
-        .empty-state { display: flex; flex-direction: column; align-items: center; padding: 60px 20px; gap: 8px; text-align: center; }
-        .empty-state p { font-size: 14px; font-weight: 500; color: var(--text-secondary); }
-        .empty-state span { font-size: 12px; color: var(--text-muted); }
-
-        .btn-ghost { padding: 9px 18px; border-radius: var(--radius-md); background: var(--glass-bg); color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--glass-border); transition: all var(--transition); }
-        .btn-ghost:hover { background: var(--glass-bg-hover); color: var(--text-primary); }
-        .btn-danger { padding: 9px 18px; border-radius: var(--radius-md); background: var(--expense-dim); color: var(--expense); font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid rgba(248,113,113,0.3); transition: all var(--transition); }
-        .btn-danger:hover { background: rgba(248,113,113,0.2); }
-      `}</style>
     </div>
   )
 }

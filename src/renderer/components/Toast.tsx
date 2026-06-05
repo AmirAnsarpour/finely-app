@@ -56,55 +56,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           )
         })}
       </div>
-      <style>{`
-        .toast-container {
-          position: fixed;
-          bottom: 24px;
-          right: 24px;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          z-index: 200;
-          pointer-events: none;
-        }
-        .toast {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 12px 16px;
-          border-radius: var(--radius-md);
-          background: rgba(10, 15, 30, 0.96);
-          backdrop-filter: blur(24px);
-          border: 1px solid transparent;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-          pointer-events: all;
-          min-width: 240px;
-          max-width: 380px;
-        }
-        [data-theme='light'] .toast {
-          background: rgba(255,255,255,0.96);
-        }
-        .toast-msg {
-          flex: 1;
-          font-size: 13px;
-          font-weight: 500;
-          color: var(--text-primary);
-        }
-        .toast-dismiss {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 20px;
-          height: 20px;
-          border-radius: 4px;
-          background: transparent;
-          border: none;
-          color: var(--text-muted);
-          cursor: pointer;
-          transition: color var(--transition);
-        }
-        .toast-dismiss:hover { color: var(--text-primary); }
-      `}</style>
     </ToastContext.Provider>
   )
 }

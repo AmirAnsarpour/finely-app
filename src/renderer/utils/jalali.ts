@@ -79,7 +79,7 @@ export const JALALI_MONTHS = [
 // Indexed by JS getDay() (0=Sun, 1=Mon, … 6=Sat)
 export const JALALI_WDAY_SHORT = ['ی', 'د', 'س', 'چ', 'پ', 'ج', 'ش']
 
-// ── Formatters ────────────────────────────────────────────────
+// ── Date formatters (input = Gregorian ISO) ───────────────────
 
 export function formatJalaliDate(iso: string): string {
   const [jy, jm, jd] = isoToJalali(iso)
@@ -92,14 +92,63 @@ export function formatJalaliShort(iso: string): string {
 }
 
 export function formatJalaliMonthYear(iso: string): string {
-  // iso is either YYYY-MM-DD or YYYY-MM (month key)
   const fullIso = iso.length === 7 ? iso + '-01' : iso
   const [jy, jm] = isoToJalali(fullIso)
   return `${JALALI_MONTHS[jm - 1]} ${jy}`
 }
 
-export function formatJalaliMonthLabel(monthKey: string): string {
-  // Use the 15th of the month as representative day
-  const [jy, jm] = isoToJalali(monthKey + '-15')
-  return `${JALALI_MONTHS[jm - 1]} ${jy}`
+// ── Month-key helpers (Jalali month keys = "JYYY-MM") ─────────
+
+function todayISO(): string {
+  return new Date().toISOString().split('T')[0]
+}
+
+/** Gregorian ISO → Jalali month key, e.g. "2024-06-01" → "1403-03" */
+export function getMonthKeyJalali(isoDate: string): string {
+  const [jy, jm] = isoToJalali(isoDate)
+  return `${jy}-${String(jm).padStart(2, '0')}`
+}
+
+/** Today's month as a Jalali month key */
+export function currentMonthKeyJalali(): string {
+  return getMonthKeyJalali(todayISO())
+}
+
+/** Previous month key in Jalali space */
+export function previousMonthKeyJalali(monthKey: string): string {
+  const [y, m] = monthKey.split('-').map(Number)
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`
+}
+
+/** Last N Jalali months ending with the current month */
+function lastNMonthsJalali(n: number): string[] {
+  const [jy, jm] = isoToJalali(todayISO())
+  const months: string[] = []
+  for (let i = n - 1; i >= 0; i--) {
+    let m = jm - i, y = jy
+    while (m <= 0) { m += 12; y-- }
+    months.push(`${y}-${String(m).padStart(2, '0')}`)
+  }
+  return months
+}
+
+export function getLast6MonthsJalali(): string[] { return lastNMonthsJalali(6) }
+export function getLast12MonthsJalali(): string[] { return lastNMonthsJalali(12) }
+
+/** Days in a Jalali month key, e.g. "1403-03" → 31 */
+export function getDaysInMonthJalali(monthKey: string): number {
+  const [jy, jm] = monthKey.split('-').map(Number)
+  return jalaliMonthLength(jy, jm)
+}
+
+/** Gregorian ISO for day D of a Jalali month key, e.g. ("1403-03", 11) → "2024-06-01" */
+export function dayISOJalali(monthKey: string, day: number): string {
+  const [jy, jm] = monthKey.split('-').map(Number)
+  return jalaliToISO(jy, jm, day)
+}
+
+/** Display label from a Jalali month key, e.g. "1403-03" → "خرداد ۰۳" */
+export function getMonthLabelJalali(monthKey: string): string {
+  const [jy, jm] = monthKey.split('-').map(Number)
+  return `${JALALI_MONTHS[jm - 1]} ${String(jy).slice(-2)}`
 }

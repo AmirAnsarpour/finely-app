@@ -1,47 +1,88 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { Lightbulb, Tag, X } from 'lucide-react'
 import type { Transaction, Category, AppSettings } from '../types'
 import { todayString } from '../utils/formatters'
+import { normalizeDigits } from '../utils/numerals'
 import Select from '../components/Select'
 import DatePicker from '../components/DatePicker'
 
 interface Props {
   categories: Category[]
   settings: AppSettings
+  transactions: Transaction[]
   initial?: Transaction
   onSave: (tx: Omit<Transaction, 'id' | 'createdAt'>) => Promise<void>
   onCancel: () => void
   onDirtyChange?: (dirty: boolean) => void
 }
 
-export default function TransactionForm({ categories, settings, initial, onSave, onCancel, onDirtyChange }: Props) {
+export default function TransactionForm({ categories, settings, transactions, initial, onSave, onCancel, onDirtyChange }: Props) {
   const [type, setType] = useState<'income' | 'expense'>(initial?.type ?? 'expense')
   const [amount, setAmount] = useState(initial?.amount?.toString() ?? '')
   const [category, setCategory] = useState(initial?.category ?? '')
   const [date, setDate] = useState(initial?.date ?? todayString())
   const [note, setNote] = useState(initial?.note ?? '')
+  const [tags, setTags] = useState<string[]>(initial?.tags ?? [])
+  const [tagInput, setTagInput] = useState('')
+  const [suggestion, setSuggestion] = useState<{ categoryId: string; categoryName: string } | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [animKey, setAnimKey] = useState(0)
   const [focused, setFocused] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const tagInputRef = useRef<HTMLInputElement>(null)
 
   const filtered = categories.filter(c => c.type === type)
   const categoryOptions = filtered.map(c => ({ value: c.id, label: c.name, color: c.color }))
 
   const isDirty = !initial
-    ? (amount !== '' || category !== '' || note !== '')
-    : (amount !== initial.amount.toString() || category !== initial.category || date !== initial.date || note !== initial.note || type !== initial.type)
+    ? (amount !== '' || category !== '' || note !== '' || tags.length > 0)
+    : (amount !== initial.amount.toString() || category !== initial.category || date !== initial.date || note !== initial.note || type !== initial.type || JSON.stringify(tags) !== JSON.stringify(initial.tags ?? []))
 
   useEffect(() => {
     onDirtyChange?.(isDirty)
   }, [isDirty])
+
+  useEffect(() => {
+    const trimmed = note.trim()
+    if (trimmed.length < 2) { setSuggestion(null); return }
+    const counts = new Map<string, number>()
+    transactions.forEach(t => {
+      if (t.type !== type) return
+      const tNote = t.note.trim()
+      if (tNote.length < 2) return
+      if (trimmed.includes(tNote) || tNote.includes(trimmed)) {
+        counts.set(t.category, (counts.get(t.category) ?? 0) + 1)
+      }
+    })
+    let topCatId = ''
+    let topCount = 0
+    counts.forEach((count, catId) => { if (count > topCount) { topCount = count; topCatId = catId } })
+    if (topCount >= 2 && topCatId && topCatId !== category) {
+      const cat = categories.find(c => c.id === topCatId)
+      setSuggestion(cat ? { categoryId: topCatId, categoryName: cat.name } : null)
+    } else {
+      setSuggestion(null)
+    }
+  }, [note, type, transactions, category])
+
+  const addTag = () => {
+    const t = tagInput.trim().replace(/,/g, '')
+    if (t && !tags.includes(t)) setTags(prev => [...prev, t])
+    setTagInput('')
+  }
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); addTag() }
+    else if (e.key === ',') { e.preventDefault(); addTag() }
+  }
 
   const parsedAmount = amount ? parseFloat(amount) : 0
   const accentColor = type === 'expense' ? 'var(--expense)' : 'var(--income)'
   const accentRaw = type === 'expense' ? '248,113,113' : '74,222,128'
 
   const formattedDisplay = amount && parsedAmount > 0
-    ? new Intl.NumberFormat(settings.currencyLocale, { maximumFractionDigits: 2 }).format(parsedAmount)
+    ? new Intl.NumberFormat(settings.currencyLocale, { maximumFractionDigits: 2, numberingSystem: 'latn' } as Intl.NumberFormatOptions).format(parsedAmount)
     : null
 
   async function handleSubmit(e: React.FormEvent) {
@@ -52,7 +93,7 @@ export default function TransactionForm({ categories, settings, initial, onSave,
     setError('')
     setSaving(true)
     try {
-      await onSave({ type, amount: amt, category, date, note })
+      await onSave({ type, amount: amt, category, date, note, tags: tags.length > 0 ? tags : undefined })
       onDirtyChange?.(false)
     } finally {
       setSaving(false)
@@ -83,11 +124,20 @@ export default function TransactionForm({ categories, settings, initial, onSave,
         <input
           ref={inputRef}
           className="amount-ghost-input"
-          type="number"
-          step="0.01"
-          min="0"
+          type="text"
+          inputMode="decimal"
           value={amount}
-          onChange={e => { setAmount(e.target.value); setAnimKey(k => k + 1) }}
+          onChange={e => {
+            const raw = normalizeDigits(e.target.value)
+            // Strip everything except digits and the first decimal point
+            const stripped = raw.replace(/[^\d.]/g, '')
+            const dot = stripped.indexOf('.')
+            const cleaned = dot === -1
+              ? stripped
+              : stripped.slice(0, dot + 1) + stripped.slice(dot + 1).replace(/\./g, '')
+            setAmount(cleaned)
+            setAnimKey(k => k + 1)
+          }}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           autoFocus
@@ -129,6 +179,46 @@ export default function TransactionForm({ categories, settings, initial, onSave,
           onChange={e => setNote(e.target.value)} className="form-input" maxLength={200} />
       </div>
 
+      {suggestion && (
+        <div className="tx-suggestion">
+          <Lightbulb size={13} />
+          <span>Suggested: <strong>{suggestion.categoryName}</strong></span>
+          <button type="button" className="tx-suggestion__use" onClick={() => setCategory(suggestion.categoryId)}>
+            Use it
+          </button>
+        </div>
+      )}
+
+      <div className="form-group">
+        <div className="tx-tag-label-row">
+          <label className="form-label">Tags <span className="form-label--opt">(optional)</span></label>
+          <span className="tx-tag-hint">Enter or , to add</span>
+        </div>
+        <div className="tx-tags-field" onMouseDown={e => { e.preventDefault(); tagInputRef.current?.focus() }}>
+          <Tag size={12} className="tx-tags-icon" />
+          <div className="tx-tags-inner">
+            {tags.map(t => (
+              <span key={t} className="tx-tag-pill">
+                <span className="tx-tag-hash">#</span>{t}
+                <button type="button" className="tx-tag-x" onMouseDown={e => e.stopPropagation()} onClick={() => setTags(prev => prev.filter(x => x !== t))}>
+                  <X size={9} />
+                </button>
+              </span>
+            ))}
+            <input
+              ref={tagInputRef}
+              className="tx-tag-input"
+              type="text"
+              autoComplete="off"
+              placeholder={tags.length === 0 ? 'vacation, food, work…' : ''}
+              value={tagInput}
+              onChange={e => setTagInput(e.target.value)}
+              onKeyDown={handleTagKeyDown}
+            />
+          </div>
+        </div>
+      </div>
+
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-actions">
@@ -139,106 +229,6 @@ export default function TransactionForm({ categories, settings, initial, onSave,
           {saving ? 'Saving…' : initial ? 'Save Changes' : `Add ${type === 'expense' ? 'Expense' : 'Income'}`}
         </button>
       </div>
-
-      <style>{`
-        .tx-form { display: flex; flex-direction: column; gap: 16px; }
-        .type-toggle {
-          display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
-          background: var(--glass-bg); border: 1px solid var(--glass-border);
-          border-radius: var(--radius-md); padding: 4px;
-        }
-        .type-btn {
-          padding: 9px 12px; border-radius: var(--radius-sm);
-          background: transparent; border: 1px solid transparent;
-          color: var(--text-secondary); font-size: 14px; font-weight: 500;
-          cursor: pointer; transition: all var(--transition);
-        }
-        .type-btn.active.expense { background: var(--expense-dim); color: var(--expense); border-color: rgba(248,113,113,0.3); }
-        .type-btn.active.income  { background: var(--income-dim);  color: var(--income);  border-color: rgba(74,222,128,0.3);  }
-
-        .amount-glass {
-          position: relative;
-          display: flex; flex-direction: column; align-items: center;
-          gap: 6px; padding: 28px 24px 22px;
-          border-radius: 20px;
-          background: rgba(255,255,255,0.028);
-          border: 1px solid rgba(255,255,255,0.055);
-          cursor: text;
-          transition: background 0.35s ease, box-shadow 0.35s ease;
-          overflow: hidden;
-        }
-        .amount-glass--focused {
-          background: rgba(255,255,255,0.045);
-        }
-        .amount-ghost-input {
-          position: absolute; inset: 0;
-          width: 100%; height: 100%;
-          opacity: 0; cursor: text;
-          border: none; background: transparent; outline: none;
-          appearance: textfield; -moz-appearance: textfield;
-        }
-        .amount-ghost-input::-webkit-outer-spin-button,
-        .amount-ghost-input::-webkit-inner-spin-button { -webkit-appearance: none; }
-
-        .amount-number {
-          font-size: 54px; font-weight: 700; letter-spacing: -2px; line-height: 1;
-          font-variant-numeric: tabular-nums;
-          animation: amountPop 0.22s cubic-bezier(0.34,1.56,0.64,1) both;
-          pointer-events: none; user-select: none;
-        }
-        .amount-ghost {
-          color: rgba(255,255,255,0.12);
-        }
-        .amount-currency {
-          font-size: 12px; font-weight: 500; color: var(--text-muted);
-          letter-spacing: 0.3px; pointer-events: none; user-select: none;
-        }
-        .amount-underline {
-          width: 32%; height: 1px; border-radius: 1px;
-          opacity: 0; transition: opacity 0.4s ease, width 0.4s ease;
-          pointer-events: none;
-        }
-        .amount-underline--on {
-          opacity: 1; width: 56%;
-          animation: underlinePulse 2.4s ease-in-out infinite;
-        }
-        @keyframes amountPop {
-          0%   { transform: scale(0.86) translateY(6px); opacity: 0.4; }
-          65%  { transform: scale(1.04) translateY(-1px); opacity: 1; }
-          100% { transform: scale(1) translateY(0); opacity: 1; }
-        }
-        @keyframes underlinePulse {
-          0%, 100% { opacity: 0.45; }
-          50%       { opacity: 0.9; }
-        }
-
-        .fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .form-group { display: flex; flex-direction: column; gap: 6px; }
-        .form-label { font-size: 12px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
-        .form-label--opt { font-weight: 400; text-transform: none; letter-spacing: 0; }
-        .form-input { user-select: text; font-size: 14px; }
-        .form-error {
-          font-size: 12px; color: var(--expense); background: var(--expense-dim);
-          padding: 8px 12px; border-radius: var(--radius-sm);
-          border: 1px solid rgba(248,113,113,0.25);
-        }
-        .form-actions { display: flex; gap: 10px; justify-content: flex-end; padding-top: 4px; }
-        .btn-submit {
-          padding: 10px 24px; border-radius: var(--radius-md);
-          background: var(--accent-dim); color: var(--accent);
-          font-size: 14px; font-weight: 600; cursor: pointer;
-          border: 1px solid var(--accent); transition: all var(--transition);
-        }
-        .btn-submit:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
-        .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-ghost {
-          padding: 10px 20px; border-radius: var(--radius-md);
-          background: var(--glass-bg); color: var(--text-secondary);
-          font-size: 14px; font-weight: 500; cursor: pointer;
-          border: 1px solid var(--glass-border); transition: all var(--transition);
-        }
-        .btn-ghost:hover { background: var(--glass-bg-hover); color: var(--text-primary); }
-      `}</style>
     </form>
   )
 }

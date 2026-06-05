@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { Check, X } from 'lucide-react'
+import { Check, X, Tag } from 'lucide-react'
 import Select from './Select'
 import DatePicker from './DatePicker'
 import type { Transaction, Category, AppSettings } from '../types'
@@ -19,10 +19,19 @@ export default function InlineEditRow({ transaction, categories, settings, onSav
   const [amount, setAmount]     = useState(String(transaction.amount))
   const [date, setDate]         = useState(transaction.date)
   const [note, setNote]         = useState(transaction.note)
+  const [tags, setTags]         = useState<string[]>(transaction.tags ?? [])
+  const [tagInput, setTagInput] = useState('')
   const [amKey, setAmKey]       = useState(0)
   const [focused, setFocused]   = useState(false)
   const [shake, setShake]       = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const tagInputRef = useRef<HTMLInputElement>(null)
+
+  const addTag = () => {
+    const t = tagInput.trim().replace(/,/g, '')
+    if (t && !tags.includes(t)) setTags(prev => [...prev, t])
+    setTagInput('')
+  }
 
   const isExpense    = type === 'expense'
   const accentRaw    = isExpense ? '248,113,113' : '74,222,128'
@@ -33,7 +42,7 @@ export default function InlineEditRow({ transaction, categories, settings, onSav
 
   const parsedAmount = amount ? parseFloat(amount) : 0
   const formattedDisplay = amount && parsedAmount > 0
-    ? new Intl.NumberFormat(settings.currencyLocale, { maximumFractionDigits: 2 }).format(parsedAmount)
+    ? new Intl.NumberFormat(settings.currencyLocale, { maximumFractionDigits: 2, numberingSystem: 'latn' } as Intl.NumberFormatOptions).format(parsedAmount)
     : null
 
   const catOptions = categories
@@ -53,7 +62,7 @@ export default function InlineEditRow({ transaction, categories, settings, onSav
       setTimeout(() => setShake(false), 500)
       return
     }
-    onSave(transaction.id, { type, category, amount: parsed, date, note })
+    onSave(transaction.id, { type, category, amount: parsed, date, note, tags: tags.length > 0 ? tags : undefined })
   }
 
   const handleKey = (e: React.KeyboardEvent) => {
@@ -138,6 +147,39 @@ export default function InlineEditRow({ transaction, categories, settings, onSav
               maxLength={200}
             />
           </div>
+          <div className="ile-field-group">
+            <div className="ile-tag-label-row">
+              <span className="ile-label">Tags</span>
+              <span className="ile-tag-hint">Enter or , to add</span>
+            </div>
+            <div className="ile-tags-field" onMouseDown={e => { e.preventDefault(); tagInputRef.current?.focus() }}>
+              <Tag size={11} className="ile-tags-icon" />
+              <div className="ile-tags-inner">
+                {tags.map(t => (
+                  <span key={t} className="ile-tag-pill">
+                    <span className="ile-tag-hash">#</span>{t}
+                    <button type="button" className="ile-tag-x" onMouseDown={e => e.stopPropagation()} onClick={() => setTags(prev => prev.filter(x => x !== t))}>
+                      <X size={8} />
+                    </button>
+                  </span>
+                ))}
+                <input
+                  ref={tagInputRef}
+                  className="ile-tag-input"
+                  type="text"
+                  autoComplete="off"
+                  placeholder={tags.length === 0 ? 'Add tags…' : ''}
+                  value={tagInput}
+                  onChange={e => setTagInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); addTag() }
+                    else if (e.key === ',') { e.preventDefault(); addTag() }
+                    else if (e.key === 'Escape') { e.stopPropagation(); onCancel() }
+                  }}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -158,108 +200,6 @@ export default function InlineEditRow({ transaction, categories, settings, onSav
         </button>
       </div>
 
-      <style>{`
-        .ile-wrap {
-          padding: 16px; border-radius: var(--radius-md);
-          background: rgba(255,255,255,0.032);
-          border: 1px solid;
-          display: flex; flex-direction: column; gap: 14px;
-          animation: slideDown 0.22s var(--ease-spring) both;
-          transition: background var(--transition);
-        }
-        @keyframes ile-shake-anim {
-          0%,100% { transform: translateX(0); }
-          20%     { transform: translateX(-5px); }
-          40%     { transform: translateX(5px); }
-          60%     { transform: translateX(-4px); }
-          80%     { transform: translateX(3px); }
-        }
-        .ile-shake { animation: ile-shake-anim 0.45s var(--ease-out) both !important; }
-
-        /* Type toggle */
-        .ile-type-row {
-          display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
-          background: var(--glass-bg); border: 1px solid var(--glass-border);
-          border-radius: var(--radius-sm); padding: 3px;
-        }
-        .ile-type-btn {
-          display: flex; align-items: center; justify-content: center; gap: 7px;
-          padding: 7px 10px; border-radius: 7px;
-          background: transparent; border: 1px solid transparent;
-          color: var(--text-muted); font-size: 13px; font-weight: 500;
-          cursor: pointer; transition: all var(--transition); font-family: inherit;
-        }
-        .ile-type-btn:hover { color: var(--text-secondary); background: var(--glass-bg-hover); }
-        .ile-type-btn--expense { background: var(--expense-dim) !important; color: var(--expense) !important; border-color: rgba(248,113,113,0.28) !important; }
-        .ile-type-btn--income  { background: var(--income-dim)  !important; color: var(--income)  !important; border-color: rgba(74,222,128,0.28)  !important; }
-        .ile-type-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-
-        /* Body layout */
-        .ile-body { display: grid; grid-template-columns: 200px 1fr; gap: 14px; align-items: stretch; }
-
-        /* Amount panel */
-        .ile-amount-panel {
-          display: flex; flex-direction: column; align-items: center; justify-content: center;
-          gap: 6px; border-radius: var(--radius-md); padding: 18px 14px 14px;
-          background: var(--glass-bg); border: 1px solid var(--glass-border);
-          cursor: text; position: relative; overflow: hidden;
-          transition: background 0.3s ease, border-color 0.3s ease;
-        }
-        .ile-amount-panel--focused { background: rgba(255,255,255,0.04); }
-        .ile-ghost-input {
-          position: absolute; inset: 0; width: 100%; height: 100%;
-          opacity: 0; cursor: text; border: none; background: transparent; outline: none;
-          appearance: textfield; -moz-appearance: textfield;
-        }
-        .ile-ghost-input::-webkit-outer-spin-button,
-        .ile-ghost-input::-webkit-inner-spin-button { -webkit-appearance: none; }
-        .ile-amount-num {
-          font-size: 36px; font-weight: 700; letter-spacing: -1.5px; line-height: 1;
-          font-variant-numeric: tabular-nums; pointer-events: none; user-select: none;
-          animation: amountPop 0.22s cubic-bezier(0.34,1.56,0.64,1) both;
-          text-align: center;
-        }
-        .ile-amount-ghost { color: rgba(255,255,255,0.1); }
-        .ile-amount-sym {
-          font-size: 11px; font-weight: 500; color: var(--text-muted);
-          letter-spacing: 0.3px; pointer-events: none; user-select: none;
-        }
-        .ile-underline {
-          width: 32%; height: 1px; border-radius: 1px;
-          opacity: 0; transition: opacity 0.35s ease, width 0.35s ease;
-          pointer-events: none;
-        }
-        .ile-underline--on { opacity: 1; width: 56%; animation: underlinePulse 2.4s ease-in-out infinite; }
-
-        /* Right fields */
-        .ile-fields { display: flex; flex-direction: column; gap: 8px; }
-        .ile-field-group { display: flex; flex-direction: column; gap: 4px; }
-        .ile-label { font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
-        .ile-note {
-          width: 100%; padding: 9px 12px; border-radius: var(--radius-sm);
-          background: var(--glass-bg); border: 1px solid var(--glass-border);
-          color: var(--text-primary); font-size: 13px; font-family: inherit;
-          outline: none; transition: border-color var(--transition), box-shadow var(--transition);
-          user-select: text;
-        }
-        .ile-note:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); background: var(--glass-bg-hover); }
-        .ile-note::placeholder { color: var(--text-muted); }
-
-        /* Actions */
-        .ile-actions { display: flex; gap: 8px; justify-content: flex-end; }
-        .ile-btn {
-          display: flex; align-items: center; gap: 6px;
-          padding: 9px 18px; border-radius: var(--radius-sm);
-          font-size: 13px; font-weight: 600; cursor: pointer;
-          border: 1px solid; transition: all var(--transition); font-family: inherit;
-        }
-        .ile-btn--cancel {
-          background: var(--glass-bg); border-color: var(--glass-border); color: var(--text-secondary);
-        }
-        .ile-btn--cancel:hover { background: var(--glass-bg-hover); color: var(--text-primary); border-color: var(--glass-border-hover); }
-        .ile-btn--save:hover { filter: brightness(1.15); transform: translateY(-1px); }
-        .ile-btn--save:active { transform: scale(0.98); }
-      `}</style>
     </div>
   )
 }

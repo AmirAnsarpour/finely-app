@@ -327,46 +327,6 @@ export default function Settings({ data }: Props) {
           </div>
         </GlassCard>
       </div>
-
-      <style>{`
-        .page-title { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
-        .page-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
-        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        @media (max-width: 900px) { .settings-grid { grid-template-columns: 1fr; } }
-        .section-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
-        .section-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 20px; }
-        .settings-section { display: flex; flex-direction: column; gap: 16px; }
-        .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-        .setting-row--col { flex-direction: column; align-items: flex-start; }
-        .setting-name { font-size: 14px; font-weight: 500; color: var(--text-primary); }
-        .setting-desc { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-        .folder-path { font-family: monospace; font-size: 11px; word-break: break-all; max-width: 100%; }
-        .folder-tip { font-size: 12px; color: var(--text-muted); background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 10px 12px; line-height: 1.6; }
-
-.btn-secondary { display: flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: var(--radius-md); background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer; transition: all var(--transition); white-space: nowrap; }
-        .btn-secondary:hover:not(:disabled) { background: var(--glass-bg-hover); color: var(--text-primary); border-color: var(--glass-border-hover); }
-        .btn-secondary:disabled { opacity: 0.55; cursor: not-allowed; }
-        .backup-row { display: flex; flex-direction: column; gap: 12px; }
-        .backup-item { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); }
-        .backup-icon { width: 40px; height: 40px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .backup-info { flex: 1; }
-        .about-info { display: flex; flex-direction: column; gap: 10px; }
-        .about-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); }
-        .about-label { font-size: 13px; color: var(--text-secondary); }
-        .about-value { font-size: 13px; font-weight: 500; color: var(--text-primary); }
-        .about-links { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; }
-        .about-link-btn {
-          display: flex; align-items: center; gap: 10px; padding: 11px 14px;
-          background: var(--glass-bg); border: 1px solid var(--glass-border);
-          border-radius: var(--radius-sm); color: var(--text-secondary);
-          font-size: 13px; font-weight: 500; cursor: pointer; text-align: left;
-          transition: background var(--transition), color var(--transition), border-color var(--transition);
-        }
-        .about-link-btn:hover { background: var(--glass-bg-hover); color: var(--text-primary); border-color: var(--glass-border-hover); }
-        .about-link-btn span { flex: 1; }
-        .about-link-ext { color: var(--text-muted); flex-shrink: 0; transition: color var(--transition); }
-        .about-link-btn:hover .about-link-ext { color: var(--text-secondary); }
-      `}</style>
     </div>
   );
 }

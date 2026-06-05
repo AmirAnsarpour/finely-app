@@ -11,6 +11,7 @@ import type { Installment, InstallmentPayment } from '../types'
 import type { UseDataReturn } from '../hooks/useData'
 import { useToast } from '../components/Toast'
 import { generateId, todayString } from '../utils/formatters'
+import { normalizeDigits } from '../utils/numerals'
 import { useCalendar } from '../utils/calendarContext'
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -118,7 +119,7 @@ function InstallmentForm({
         <div className="form-readonly-row">
           <div className="form-readonly">
             <span className="form-readonly__label">Monthly Payment</span>
-            <span className="form-readonly__value">{initial!.monthlyAmount.toLocaleString()}</span>
+            <span className="form-readonly__value">{initial!.monthlyAmount.toLocaleString('en-US')}</span>
           </div>
           <div className="form-readonly">
             <span className="form-readonly__label">Payments</span>
@@ -134,11 +135,11 @@ function InstallmentForm({
           {/* Monthly amount — no spin arrows */}
           <div className="form-group">
             <label className="form-label">Monthly Payment</label>
-            <input className="form-input no-spinner" type="number" min="0.01" step="0.01"
-              value={monthlyAmount} onChange={e => setMonthlyAmount(e.target.value)}
-              placeholder="e.g. 500" inputMode="decimal" />
+            <input className="form-input" type="text" inputMode="decimal"
+              value={monthlyAmount} onChange={e => setMonthlyAmount(normalizeDigits(e.target.value))}
+              placeholder="e.g. 500" />
             {derivedTotal > 0 && (
-              <span className="form-hint">Total: {derivedTotal.toLocaleString()}</span>
+              <span className="form-hint">Total: {derivedTotal.toLocaleString('en-US')}</span>
             )}
           </div>
 
@@ -196,64 +197,6 @@ function InstallmentForm({
           {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Installment'}
         </button>
       </div>
-
-      <style>{`
-        .inst-form { display: flex; flex-direction: column; gap: 12px; }
-        .form-group { display: flex; flex-direction: column; gap: 5px; }
-        .form-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-        .form-optional { font-weight: 400; color: var(--text-muted); font-size: 10px; text-transform: none; letter-spacing: 0; }
-        .form-hint { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
-        .form-input { user-select: text; }
-        .form-textarea { resize: none; font-family: inherit; }
-        /* Hide number spin buttons */
-        .no-spinner::-webkit-inner-spin-button,
-        .no-spinner::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        .no-spinner { -moz-appearance: textfield; }
-        /* Month presets */
-        .month-presets { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
-        .month-preset {
-          padding: 3px 9px; border-radius: 16px; font-size: 11px; font-weight: 600;
-          border: 1px solid var(--glass-border); background: var(--glass-bg);
-          color: var(--text-muted); cursor: pointer;
-          transition: all var(--transition);
-        }
-        .month-preset:hover { background: var(--glass-bg-hover); color: var(--text-primary); border-color: var(--glass-border-hover); }
-        .month-preset--active { background: var(--accent-dim); color: var(--accent); border-color: var(--glass-border-accent); }
-        /* Custom stepper */
-        .month-stepper {
-          display: flex; align-items: center;
-          border: 1px solid var(--glass-border); border-radius: var(--radius-md);
-          background: var(--glass-bg); overflow: hidden; height: 40px;
-        }
-        .stepper-btn {
-          width: 38px; height: 100%; display: flex; align-items: center; justify-content: center;
-          background: transparent; border: none; color: var(--text-secondary);
-          cursor: pointer; transition: background var(--transition), color var(--transition);
-          flex-shrink: 0;
-        }
-        .stepper-btn:hover:not(:disabled) { background: var(--glass-bg-hover); color: var(--text-primary); }
-        .stepper-btn:disabled { opacity: 0.25; cursor: not-allowed; }
-        .stepper-display {
-          flex: 1; display: flex; flex-direction: column; align-items: center;
-          border-left: 1px solid var(--glass-border); border-right: 1px solid var(--glass-border);
-          padding: 2px 0;
-        }
-        .stepper-num { font-size: 16px; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
-        .stepper-unit { font-size: 10px; color: var(--text-muted); line-height: 1; }
-        /* Read-only row (edit mode) */
-        .form-readonly-row { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 12px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); }
-        .form-readonly { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 70px; }
-        .form-readonly__label { font-size: 10px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
-        .form-readonly__value { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-        /* Misc */
-        .form-error { font-size: 12px; color: var(--expense); background: var(--expense-dim); padding: 7px 12px; border-radius: var(--radius-sm); border: 1px solid rgba(248,113,113,0.25); }
-        .form-actions { display: flex; gap: 10px; justify-content: flex-end; padding-top: 2px; }
-        .btn-primary { padding: 10px 20px; border-radius: var(--radius-md); background: var(--accent); color: white; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: background var(--transition), opacity var(--transition); }
-        .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-        .btn-ghost { padding: 10px 20px; border-radius: var(--radius-md); background: var(--glass-bg); color: var(--text-secondary); font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid var(--glass-border); transition: background var(--transition), color var(--transition); }
-        .btn-ghost:hover { background: var(--glass-bg-hover); color: var(--text-primary); }
-      `}</style>
     </form>
   )
 }
@@ -311,7 +254,7 @@ function PaymentsModal({
                   </span>
                 )}
               </div>
-              <span className="pm-item__amount">{currencySymbol}{payment.amount.toLocaleString()}</span>
+              <span className="pm-item__amount">{currencySymbol}{payment.amount.toLocaleString('en-US')}</span>
               <button
                 className={`pm-check ${payment.isPaid ? 'pm-check--paid' : ''}`}
                 onClick={() => payment.isPaid ? onMarkUnpaid(payment.id) : onMarkPaid(payment.id)}
@@ -324,29 +267,6 @@ function PaymentsModal({
           )
         })}
       </div>
-
-      <style>{`
-        .pm-wrap { display: flex; flex-direction: column; gap: 14px; }
-        .pm-summary { display: flex; flex-direction: column; gap: 6px; }
-        .pm-progress-bar { height: 6px; background: var(--glass-bg-hover); border-radius: 3px; overflow: hidden; }
-        .pm-progress-fill { height: 100%; border-radius: 3px; transition: width 0.4s var(--ease-spring); }
-        .pm-progress-label { font-size: 12px; color: var(--text-muted); }
-        .pm-list { display: flex; flex-direction: column; gap: 4px; max-height: 360px; overflow-y: auto; }
-        .pm-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--glass-bg); border: 1px solid var(--glass-border); transition: background var(--transition), border-color var(--transition); }
-        .pm-item--paid { opacity: 0.6; }
-        .pm-item--overdue { background: var(--expense-dim); border-color: rgba(248,113,113,0.25); }
-        .pm-item--soon { background: rgba(251,191,36,0.06); border-color: rgba(251,191,36,0.25); }
-        .pm-item__num { font-size: 11px; font-weight: 600; color: var(--text-muted); min-width: 24px; }
-        .pm-item__info { flex: 1; display: flex; flex-direction: column; gap: 1px; }
-        .pm-item__date { font-size: 13px; font-weight: 500; color: var(--text-primary); }
-        .pm-item__sub { font-size: 11px; color: var(--text-muted); }
-        .pm-item__sub--overdue { color: var(--expense); }
-        .pm-item__sub--soon { color: var(--warning); }
-        .pm-item__amount { font-size: 13px; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
-        .pm-check { background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; justify-content: center; padding: 2px; border-radius: 50%; transition: color var(--transition), transform var(--transition-spring); }
-        .pm-check:hover { transform: scale(1.15); color: var(--text-primary); }
-        .pm-check--paid { }
-      `}</style>
     </div>
   )
 }
@@ -393,7 +313,7 @@ function InstallmentCard({
             )}
           </div>
           <div className="inst-card__monthly">
-            <span className="inst-card__amount">{currencySymbol}{installment.monthlyAmount.toLocaleString()}</span>
+            <span className="inst-card__amount">{currencySymbol}{installment.monthlyAmount.toLocaleString('en-US')}</span>
             <span className="inst-card__per-mo">/mo</span>
           </div>
         </div>
@@ -456,37 +376,6 @@ function InstallmentCard({
           </div>
         </div>
       </div>
-
-      <style>{`
-        .inst-card { display: flex; overflow: hidden; padding: 0; }
-        .inst-card__accent { width: 4px; flex-shrink: 0; }
-        .inst-card__body { flex: 1; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-        .inst-card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-        .inst-card__meta { flex: 1; min-width: 0; }
-        .inst-card__name { font-size: 16px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .inst-card__creditor { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); margin-top: 3px; }
-        .inst-card__monthly { text-align: right; flex-shrink: 0; }
-        .inst-card__amount { font-size: 18px; font-weight: 700; color: var(--text-primary); }
-        .inst-card__per-mo { font-size: 12px; color: var(--text-muted); margin-left: 1px; }
-        .inst-card__progress { display: flex; flex-direction: column; gap: 5px; }
-        .inst-card__bar { height: 5px; background: var(--glass-bg-hover); border-radius: 3px; overflow: hidden; }
-        .inst-card__bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s var(--ease-spring); }
-        .inst-card__progress-row { display: flex; justify-content: space-between; }
-        .inst-card__progress-text { font-size: 12px; color: var(--text-secondary); }
-        .inst-card__remaining { font-size: 12px; color: var(--text-muted); }
-        .inst-card__next { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); padding: 6px 10px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); }
-        .inst-card__next--soon { color: var(--warning); background: rgba(251,191,36,0.06); border-color: rgba(251,191,36,0.25); }
-        .inst-card__next--overdue { color: var(--expense); background: var(--expense-dim); border-color: rgba(248,113,113,0.25); }
-        .inst-card__done { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
-        .inst-card__notes { font-size: 12px; color: var(--text-muted); line-height: 1.5; padding: 6px 10px; background: var(--glass-bg); border-radius: var(--radius-sm); border: 1px solid var(--glass-border); }
-        .inst-card__actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 2px; }
-        .inst-card__icon-actions { display: flex; gap: 5px; margin-left: auto; }
-        .btn-mark-paid { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius-sm); background: transparent; border: 1px solid; font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition); }
-        .btn-mark-paid:hover { opacity: 0.8; }
-        .icon-action { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: var(--radius-xs); background: transparent; border: 1px solid var(--glass-border); color: var(--text-muted); cursor: pointer; transition: all var(--transition); }
-        .icon-action:hover { background: var(--glass-bg-hover); color: var(--text-primary); }
-        .icon-action--danger:hover { background: var(--expense-dim); color: var(--expense); border-color: rgba(248,113,113,0.3); }
-      `}</style>
     </GlassCard>
   )
 }
@@ -685,31 +574,6 @@ export default function Installments({ data }: { data: UseDataReturn }) {
           <button className="btn-danger" onClick={handleConfirmDelete}>Delete</button>
         </div>
       </Modal>
-
-      <style>{`
-        .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 12px; flex-wrap: wrap; }
-        .page-title {
-          font-size: 26px; font-weight: 700; letter-spacing: -0.5px;
-          background: linear-gradient(135deg, #e8eaff 0%, rgba(255,255,255,0.65) 100%);
-          -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-        }
-        .page-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
-        .btn-add { display: flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: var(--radius-md); background: var(--accent-dim); border: 1px solid rgba(108,142,245,0.35); color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; transition: all var(--transition); }
-        .btn-add:hover { background: rgba(108,142,245,0.2); border-color: rgba(108,142,245,0.55); }
-        [data-theme='black'] .btn-add { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.12); color: var(--text-primary); }
-        [data-theme='black'] .btn-add:hover { background: rgba(255,255,255,0.09); }
-        .empty-state { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 48px 24px; text-align: center; }
-        .empty-title { font-size: 16px; font-weight: 600; color: var(--text-secondary); }
-        .empty-sub { font-size: 13px; color: var(--text-muted); max-width: 320px; line-height: 1.6; }
-        .inst-section { margin-bottom: 28px; }
-        .inst-section__title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-        .inst-section__count { background: var(--glass-bg-hover); border: 1px solid var(--glass-border); border-radius: 10px; padding: 1px 7px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: none; letter-spacing: 0; }
-        .inst-grid { display: flex; flex-direction: column; gap: 10px; }
-        .btn-ghost { padding: 10px 20px; border-radius: var(--radius-md); background: var(--glass-bg); color: var(--text-secondary); font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid var(--glass-border); transition: background var(--transition), color var(--transition); }
-        .btn-ghost:hover { background: var(--glass-bg-hover); color: var(--text-primary); }
-        .btn-danger { padding: 10px 20px; border-radius: var(--radius-md); background: var(--expense-dim); color: var(--expense); font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid rgba(248,113,113,0.3); transition: all var(--transition); }
-        .btn-danger:hover { background: rgba(248,113,113,0.2); }
-      `}</style>
     </div>
   )
 }

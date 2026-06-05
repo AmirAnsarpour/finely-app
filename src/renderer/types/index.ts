@@ -5,6 +5,7 @@ export interface Transaction {
   category: string
   date: string
   note: string
+  tags?: string[]
   createdAt: string
 }
 
@@ -47,6 +48,18 @@ export interface Installment {
   payments: InstallmentPayment[]
   notes?: string
   color: string
+  createdAt: string
+}
+
+export interface Goal {
+  id: string
+  name: string
+  targetAmount: number
+  currentAmount: number
+  color: string
+  icon: string
+  deadline?: string   // ISO date, optional
+  notes?: string
   createdAt: string
 }
 

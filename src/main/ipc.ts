@@ -28,11 +28,27 @@ function saveConfig(config: AppConfig): void {
 
 let config = loadConfig()
 
+// ── Per-file write queue — prevents concurrent-write corruption ───────────────
+const writeQueues = new Map<string, Promise<void>>()
+function queueWrite(fp: string, fn: () => void): Promise<void> {
+  const prev = writeQueues.get(fp) ?? Promise.resolve()
+  const next = prev.then(fn).catch(() => {})
+  writeQueues.set(fp, next)
+  return next
+}
+
+// ── RFC 4180 CSV field quoting ────────────────────────────────────────────────
+function csvField(value: string): string {
+  if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`
+  return value
+}
+
 const FILE_MAP: Record<string, string> = {
   transactions: 'transactions.json',
   categories: 'categories.json',
   settings: 'settings.json',
-  installments: 'installments.json'
+  installments: 'installments.json',
+  goals: 'goals.json'
 }
 
 function ensureDataFolder(): void {
@@ -59,8 +75,11 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('write-data', async (_event, { file, data }: { file: string; data: unknown }) => {
+    if (data === undefined || data === null) throw new Error(`write-data: refusing null/undefined payload for "${file}"`)
+    if (typeof data !== 'object') throw new Error(`write-data: payload for "${file}" must be an object or array`)
     ensureDataFolder()
-    fs.writeFileSync(filePath(file), JSON.stringify(data, null, 2), 'utf-8')
+    const fp = filePath(file)
+    await queueWrite(fp, () => fs.writeFileSync(fp, JSON.stringify(data, null, 2), 'utf-8'))
     return true
   })
 
@@ -94,9 +113,10 @@ export function registerIpcHandlers(): void {
     const header = 'Date,Type,Category,Amount,Note\n'
     const rows = transactions.map((t) => {
       const cat = categories.find((c) => c['id'] === t['category']) as Record<string, unknown> | undefined
-      const catName = cat ? String(cat['name']) : String(t['category'])
-      const note = String(t['note'] ?? '').replace(/,/g, ';')
-      return `${t['date']},${t['type']},${catName},${currencySymbol}${t['amount']},${note}`
+      const catName = csvField(cat ? String(cat['name']) : String(t['category']))
+      const amount = csvField(`${currencySymbol}${t['amount']}`)
+      const note = csvField(String(t['note'] ?? ''))
+      return `${t['date']},${t['type']},${catName},${amount},${note}`
     }).join('\n')
 
     fs.writeFileSync(result.filePath, header + rows, 'utf-8')

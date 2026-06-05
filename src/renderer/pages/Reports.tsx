@@ -1,17 +1,24 @@
-import React, { useState, useMemo } from 'react'
-import { Download, TrendingUp, TrendingDown, Wallet, PiggyBank, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react'
+import React, { useState, useMemo, useEffect } from 'react'
+import { Download, TrendingUp, TrendingDown, Wallet, PiggyBank, ArrowUpRight, ArrowDownRight, Minus, BarChart2, PieChart, Activity, Tag } from 'lucide-react'
 import GlassCard from '../components/GlassCard'
 import { MonthlyBarChart, ExpensePieChart, DailySpendingChart } from '../components/Chart'
 import CategoryIcon from '../components/CategoryIcon'
 import type { UseDataReturn } from '../hooks/useData'
-import {
-  formatCurrency, getMonthKey,
-  getLast12Months, previousMonthKey
-} from '../utils/formatters'
+import { formatCurrency } from '../utils/formatters'
 import { useCalendar } from '../utils/calendarContext'
 import { useToast } from '../components/Toast'
 
 interface Props { data: UseDataReturn }
+
+function EmptyChart({ icon: Icon, message, hint }: { icon: React.ElementType; message: string; hint?: string }) {
+  return (
+    <div className="empty-chart">
+      <Icon size={28} style={{ opacity: 0.25, marginBottom: 8 }} />
+      <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>{message}</p>
+      {hint && <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-muted)', opacity: 0.65 }}>{hint}</p>}
+    </div>
+  )
+}
 
 function DeltaBadge({ cur, prev, goodIfPositive }: { cur: number; prev: number; goodIfPositive: boolean }) {
   if (prev === 0) return <span className="r-delta r-delta--neutral">— no prior data</span>
@@ -28,10 +35,22 @@ function DeltaBadge({ cur, prev, goodIfPositive }: { cur: number; prev: number; 
 export default function Reports({ data }: Props) {
   const { transactions, categories, settings, exportCSV } = data
   const { toast } = useToast()
-  const { formatDateShort, getMonthLabel } = useCalendar()
+  const {
+    calendarType, formatDateShort, getMonthLabel,
+    getMonthKey, currentMonthKey, getLast12Months, previousMonthKey,
+    getDaysInMonth, dayISO,
+  } = useCalendar()
 
-  const months = getLast12Months()
-  const [selectedMonth, setSelectedMonth] = useState(months[months.length - 1])
+  const months = useMemo(() => getLast12Months(), [calendarType])
+  const [selectedMonth, setSelectedMonth] = useState(() => months[months.length - 1])
+  const [selectedYear, setSelectedYear] = useState(() => parseInt(currentMonthKey().slice(0, 4)))
+  const [tagScope, setTagScope] = useState<'month' | 'all'>('month')
+  const [selectedTag, setSelectedTag] = useState<string | null>(null)
+
+  // Reset selected month whenever the calendar system changes
+  useEffect(() => {
+    setSelectedMonth(months[months.length - 1])
+  }, [months])
 
   const fmt = (n: number) => formatCurrency(n, settings.currencySymbol, settings.currencyLocale)
 
@@ -46,7 +65,7 @@ export default function Reports({ data }: Props) {
   const savingsRate   = monthIncome > 0 ? (monthNet / monthIncome) * 100 : 0
 
   // ── Previous month for comparison ───────────────────────
-  const prevMonth = useMemo(() => previousMonthKey(selectedMonth), [selectedMonth])
+  const prevMonth = useMemo(() => previousMonthKey(selectedMonth), [previousMonthKey, selectedMonth])
   const prevTxs = useMemo(() =>
     transactions.filter(t => getMonthKey(t.date) === prevMonth),
     [transactions, prevMonth])
@@ -82,18 +101,17 @@ export default function Reports({ data }: Props) {
 
   // ── Day-by-day chart data ────────────────────────────────
   const dailyData = useMemo(() => {
-    const [y, m] = selectedMonth.split('-').map(Number)
-    const daysInMonth = new Date(y, m, 0).getDate()
+    const daysInMonth = getDaysInMonth(selectedMonth)
     return Array.from({ length: daysInMonth }, (_, i) => {
       const day = i + 1
-      const iso = `${selectedMonth}-${String(day).padStart(2, '0')}`
+      const iso = dayISO(selectedMonth, day)
       return {
         day: String(day),
         expense: currentTxs.filter(t => t.type === 'expense' && t.date === iso).reduce((s, t) => s + t.amount, 0),
         income:  currentTxs.filter(t => t.type === 'income'  && t.date === iso).reduce((s, t) => s + t.amount, 0)
       }
     })
-  }, [currentTxs, selectedMonth])
+  }, [currentTxs, selectedMonth, getDaysInMonth, dayISO])
 
   // ── Top 5 biggest expense transactions ──────────────────
   const topExpenses = useMemo(() =>
@@ -106,7 +124,7 @@ export default function Reports({ data }: Props) {
       month: getMonthLabel(month),
       income:   transactions.filter(t => t.type === 'income'  && getMonthKey(t.date) === month).reduce((s, t) => s + t.amount, 0),
       expenses: transactions.filter(t => t.type === 'expense' && getMonthKey(t.date) === month).reduce((s, t) => s + t.amount, 0)
-    })), [transactions, months, getMonthLabel])
+    })), [transactions, months, getMonthKey, getMonthLabel])
 
   // ── Budget tracker ───────────────────────────────────────
   const budgetItems = useMemo(() =>
@@ -118,6 +136,53 @@ export default function Reports({ data }: Props) {
         return { cat: c, spent, pct, over: spent > c.budget! }
       }),
     [categories, currentTxs])
+
+  // ── Tag analysis ────────────────────────────────────────
+  const tagScopedTxs = tagScope === 'month' ? currentTxs : transactions
+
+  const tagStats = useMemo(() => {
+    const map = new Map<string, { count: number; income: number; expenses: number }>()
+    tagScopedTxs.forEach(t => {
+      t.tags?.forEach(tag => {
+        const e = map.get(tag) ?? { count: 0, income: 0, expenses: 0 }
+        map.set(tag, {
+          count: e.count + 1,
+          income: e.income + (t.type === 'income' ? t.amount : 0),
+          expenses: e.expenses + (t.type === 'expense' ? t.amount : 0),
+        })
+      })
+    })
+    return Array.from(map.entries())
+      .map(([tag, s]) => ({ tag, ...s, net: s.income - s.expenses }))
+      .sort((a, b) => (b.income + b.expenses) - (a.income + a.expenses))
+  }, [tagScopedTxs])
+
+  const tagTxs = useMemo(() =>
+    selectedTag
+      ? tagScopedTxs.filter(t => t.tags?.includes(selectedTag)).sort((a, b) => b.date.localeCompare(a.date))
+      : [],
+    [tagScopedTxs, selectedTag])
+
+  // ── Yearly overview ──────────────────────────────────────
+  const yearlyData = useMemo(() =>
+    Array.from({ length: 12 }, (_, i) => {
+      const key = `${selectedYear}-${String(i + 1).padStart(2, '0')}`
+      const txs = transactions.filter(t => getMonthKey(t.date) === key)
+      const income = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+      const expenses = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+      const net = income - expenses
+      const savingsRate = income > 0 ? (net / income) * 100 : 0
+      return { monthNum: i + 1, key, income, expenses, net, savingsRate, empty: txs.length === 0 }
+    }),
+    [transactions, selectedYear, getMonthKey])
+
+  const yearlyTotals = useMemo(() => {
+    const income = yearlyData.reduce((s, r) => s + r.income, 0)
+    const expenses = yearlyData.reduce((s, r) => s + r.expenses, 0)
+    const net = income - expenses
+    const savingsRate = income > 0 ? (net / income) * 100 : 0
+    return { income, expenses, net, savingsRate }
+  }, [yearlyData])
 
   const handleExportCSV = async () => {
     const ok = await exportCSV()
@@ -184,7 +249,7 @@ export default function Reports({ data }: Props) {
           <h2 className="section-title">Top Spending Categories</h2>
           <p className="section-sub">{getMonthLabel(selectedMonth)}</p>
           {expenseBreakdown.length === 0 ? (
-            <div className="empty-chart">No expenses this month</div>
+            <EmptyChart icon={TrendingDown} message="No expenses this month" hint="Add transactions to see your spending breakdown" />
           ) : (
             <div className="top-cats">
               {expenseBreakdown.map((item, i) => (
@@ -212,7 +277,7 @@ export default function Reports({ data }: Props) {
           <h2 className="section-title">Expense Breakdown</h2>
           <p className="section-sub">{getMonthLabel(selectedMonth)}</p>
           {expenseBreakdown.length === 0 ? (
-            <div className="empty-chart">No expense data</div>
+            <EmptyChart icon={PieChart} message="No expense data" hint="Your category breakdown will appear here" />
           ) : (
             <>
               <ExpensePieChart data={expenseBreakdown} currencySymbol={settings.currencySymbol} currencyLocale={settings.currencyLocale} />
@@ -245,7 +310,7 @@ export default function Reports({ data }: Props) {
           <h2 className="section-title">Income Sources</h2>
           <p className="section-sub">{getMonthLabel(selectedMonth)}</p>
           {incomeBreakdown.length === 0 ? (
-            <div className="empty-chart">No income this month</div>
+            <EmptyChart icon={TrendingUp} message="No income this month" hint="Income transactions will appear here" />
           ) : (
             <div className="breakdown-list" style={{ marginTop: 14 }}>
               {incomeBreakdown.map(item => (
@@ -268,7 +333,7 @@ export default function Reports({ data }: Props) {
           <h2 className="section-title">Biggest Expenses</h2>
           <p className="section-sub">Top 5 single transactions this month</p>
           {topExpenses.length === 0 ? (
-            <div className="empty-chart">No expenses this month</div>
+            <EmptyChart icon={Activity} message="No expenses this month" hint="Your largest single transactions will appear here" />
           ) : (
             <div className="big-tx-list">
               {topExpenses.map((t, i) => {
@@ -334,92 +399,168 @@ export default function Reports({ data }: Props) {
         </GlassCard>
       )}
 
-      <style>{`
-        .rp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; gap: 12px; flex-wrap: wrap; }
-        .page-title {
-          font-size: 26px; font-weight: 700; letter-spacing: -0.5px;
-          background: linear-gradient(135deg, #e8eaff 0%, rgba(255,255,255,0.65) 100%);
-          -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-        }
-        .page-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
-        .btn-export { display: flex; align-items: center; gap: 7px; padding: 10px 18px; border-radius: var(--radius-md); background: var(--glass-bg); color: var(--text-secondary); font-size: 14px; font-weight: 500; border: 1px solid var(--glass-border); cursor: pointer; transition: all var(--transition); }
-        .btn-export:hover { background: var(--glass-bg-hover); color: var(--text-primary); border-color: var(--glass-border-hover); }
+      {/* ── Tag analysis ────────────────────────────────────── */}
+      {(tagStats.length > 0 || transactions.some(t => t.tags && t.tags.length > 0)) && (
+        <GlassCard className="card-appear" style={{ marginTop: 0 }}>
+          <div className="ta-header">
+            <div className="ta-title-row">
+              <div className="ta-icon-wrap"><Tag size={15} color="var(--accent)" /></div>
+              <div>
+                <h2 className="section-title">Tag Analysis</h2>
+                <p className="section-sub" style={{ marginBottom: 0 }}>Spending and income by tag</p>
+              </div>
+            </div>
+            <div className="ta-scope-toggle">
+              {(['month', 'all'] as const).map(s => (
+                <button key={s}
+                  className={`ta-scope-btn ${tagScope === s ? 'ta-scope-btn--active' : ''}`}
+                  onClick={() => { setTagScope(s); setSelectedTag(null) }}>
+                  {s === 'month' ? 'This month' : 'All time'}
+                </button>
+              ))}
+            </div>
+          </div>
 
-        /* Month tabs */
-        .month-tabs { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 16px; padding-bottom: 4px; }
-        .month-tab { padding: 7px 13px; border-radius: var(--radius-sm); background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; transition: all var(--transition); white-space: nowrap; flex-shrink: 0; }
-        .month-tab:hover { background: var(--glass-bg-hover); color: var(--text-primary); }
-        .month-tab--active { background: var(--accent-dim); color: var(--accent); border-color: var(--glass-border-accent); }
+          {tagStats.length === 0 ? (
+            <div className="ta-empty">
+              <Tag size={24} style={{ opacity: 0.2 }} />
+              <p>No tagged transactions {tagScope === 'month' ? 'this month' : 'yet'}</p>
+              <span>Add tags when recording transactions to analyze them here</span>
+            </div>
+          ) : (
+            <>
+              {/* Tag cloud */}
+              <div className="ta-cloud">
+                {tagStats.map(ts => (
+                  <button key={ts.tag}
+                    className={`ta-cloud-pill ${selectedTag === ts.tag ? 'ta-cloud-pill--active' : ''}`}
+                    onClick={() => setSelectedTag(selectedTag === ts.tag ? null : ts.tag)}>
+                    <span className="ta-cloud-hash">#</span>{ts.tag}
+                    <span className="ta-cloud-badge">{ts.count}</span>
+                  </button>
+                ))}
+              </div>
 
-        /* KPI cards */
-        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
-        @media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
-        .kpi-card { display: flex; align-items: flex-start; gap: 12px; }
-        .kpi-icon { width: 38px; height: 38px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .kpi-body { flex: 1; min-width: 0; }
-        .kpi-label { font-size: 11px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
-        .kpi-value { font-size: 19px; font-weight: 700; margin: 4px 0 3px; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
-        .kpi-footer { display: flex; align-items: center; }
-        .r-delta { display: flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 500; }
-        .r-delta--good { color: var(--income); }
-        .r-delta--bad { color: var(--expense); }
-        .r-delta--neutral { color: var(--text-muted); }
+              {/* Stats table */}
+              <div className="ta-table-wrap">
+                <table className="ta-table">
+                  <thead>
+                    <tr>
+                      <th className="ta-th">Tag</th>
+                      <th className="ta-th ta-th--num">Txns</th>
+                      <th className="ta-th ta-th--num">Income</th>
+                      <th className="ta-th ta-th--num">Expenses</th>
+                      <th className="ta-th ta-th--num">Net</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tagStats.map(ts => (
+                      <tr key={ts.tag}
+                        className={`ta-tr ${selectedTag === ts.tag ? 'ta-tr--selected' : ''}`}
+                        onClick={() => setSelectedTag(selectedTag === ts.tag ? null : ts.tag)}>
+                        <td className="ta-td">
+                          <span className="ta-tag-name"><span className="ta-tag-hash">#</span>{ts.tag}</span>
+                        </td>
+                        <td className="ta-td ta-td--num ta-td--muted">{ts.count}</td>
+                        <td className="ta-td ta-td--num" style={{ color: ts.income > 0 ? 'var(--income)' : undefined }}>
+                          {ts.income > 0 ? fmt(ts.income) : <span className="ta-dash">—</span>}
+                        </td>
+                        <td className="ta-td ta-td--num" style={{ color: ts.expenses > 0 ? 'var(--expense)' : undefined }}>
+                          {ts.expenses > 0 ? fmt(ts.expenses) : <span className="ta-dash">—</span>}
+                        </td>
+                        <td className="ta-td ta-td--num ta-td--net" style={{ color: ts.net >= 0 ? 'var(--income)' : 'var(--expense)' }}>
+                          {ts.net >= 0 ? '+' : '−'}{fmt(Math.abs(ts.net))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-        /* 2-column grid for analysis sections */
-        .rp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-        @media (max-width: 900px) { .rp-grid { grid-template-columns: 1fr; } }
-        .section-title { font-size: 15px; font-weight: 600; }
-        .section-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; margin-bottom: 14px; }
-        .empty-chart { text-align: center; padding: 50px 20px; color: var(--text-muted); font-size: 13px; }
+              {/* Selected-tag drill-down */}
+              {selectedTag && tagTxs.length > 0 && (
+                <div className="ta-drilldown">
+                  <div className="ta-drilldown-label">
+                    <span className="ta-drilldown-tag"><span style={{ opacity: 0.55 }}>#</span>{selectedTag}</span>
+                    <span className="ta-drilldown-count">{tagTxs.length} transaction{tagTxs.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="ta-tx-list">
+                    {tagTxs.slice(0, 12).map(t => {
+                      const cat = categories.find(c => c.id === t.category)
+                      return (
+                        <div key={t.id} className="ta-tx-row">
+                          <CategoryIcon icon={cat?.icon ?? 'tag'} color={cat?.color ?? '#94a3b8'} size={13} showBg bgSize={28} />
+                          <div className="ta-tx-info">
+                            <span className="ta-tx-cat">{cat?.name ?? 'Unknown'}</span>
+                            {t.note && <span className="ta-tx-note">{t.note}</span>}
+                          </div>
+                          <span className={`ta-tx-amt ${t.type}`}>{t.type === 'income' ? '+' : '−'}{fmt(t.amount)}</span>
+                          <span className="ta-tx-date">{formatDateShort(t.date)}</span>
+                        </div>
+                      )
+                    })}
+                    {tagTxs.length > 12 && (
+                      <p className="ta-more">+{tagTxs.length - 12} more</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </GlassCard>
+      )}
 
-        /* Top categories */
-        .top-cats { display: flex; flex-direction: column; gap: 10px; }
-        .top-cat-row { display: flex; align-items: center; gap: 10px; }
-        .rank { font-size: 11px; font-weight: 700; color: var(--text-muted); min-width: 20px; text-align: right; }
-        .rank--expense { color: var(--expense); }
-        .top-cat-info { flex: 1; min-width: 0; }
-        .top-cat-meta { display: flex; align-items: baseline; gap: 6px; margin-bottom: 5px; }
-        .top-cat-name { font-size: 13px; font-weight: 500; color: var(--text-primary); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .top-cat-pct { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
-        .top-cat-amt { font-size: 13px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .top-cat-bar-wrap { height: 4px; background: var(--glass-bg-hover); border-radius: 2px; overflow: hidden; }
-        .top-cat-bar { height: 100%; border-radius: 2px; transition: width 0.5s var(--ease-out); }
-
-        /* Pie legend */
-        .pie-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 4px 2px 0; }
-        .pie-legend-item { display: flex; align-items: center; gap: 6px; }
-        .pie-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .pie-legend-name { font-size: 11px; color: var(--text-secondary); }
-
-        /* Income breakdown rows */
-        .breakdown-list { display: flex; flex-direction: column; gap: 8px; }
-        .breakdown-row { display: flex; align-items: center; gap: 10px; }
-        .breakdown-name { font-size: 13px; font-weight: 500; color: var(--text-primary); min-width: 90px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .breakdown-bar-wrap { flex: 1; height: 5px; background: var(--glass-bg); border-radius: 3px; overflow: hidden; }
-        .breakdown-bar { height: 100%; border-radius: 3px; transition: width 0.5s var(--ease-out); }
-        .breakdown-pct { font-size: 12px; color: var(--text-muted); min-width: 34px; text-align: right; }
-        .breakdown-amt { font-size: 13px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; min-width: 76px; text-align: right; }
-
-        /* Biggest transactions */
-        .big-tx-list { display: flex; flex-direction: column; gap: 8px; }
-        .big-tx-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); }
-        .big-tx-info { flex: 1; min-width: 0; }
-        .big-tx-name { display: block; font-size: 13px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .big-tx-note { display: block; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .big-tx-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
-        .big-tx-amt { font-size: 13px; font-weight: 700; color: var(--expense); font-variant-numeric: tabular-nums; }
-        .big-tx-date { font-size: 11px; color: var(--text-muted); }
-
-        /* Budget tracker */
-        .budget-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 16px; }
-        .budget-item { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); }
-        .budget-item__header { display: flex; align-items: center; justify-content: space-between; }
-        .budget-item__name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
-        .budget-item__amounts { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
-        .budget-bar-wrap { height: 6px; background: var(--glass-bg-hover); border-radius: 3px; overflow: hidden; }
-        .budget-bar { height: 100%; border-radius: 3px; transition: width 0.6s var(--ease-out); }
-        .budget-item__footer { display: flex; justify-content: space-between; }
-      `}</style>
+      {/* ── Yearly overview ─────────────────────────────────── */}
+      <GlassCard className="card-appear" style={{ marginTop: 16 }}>
+        <div className="yr-header">
+          <div>
+            <h2 className="section-title">Yearly Overview</h2>
+            <p className="section-sub">Month-by-month breakdown for {selectedYear}</p>
+          </div>
+          <div className="yr-nav">
+            <button className="yr-nav-btn" onClick={() => setSelectedYear(y => y - 1)}>‹</button>
+            <span className="yr-nav-label">{selectedYear}</span>
+            <button className="yr-nav-btn" onClick={() => setSelectedYear(y => y + 1)}>›</button>
+          </div>
+        </div>
+        <div className="yr-table-wrap">
+          <table className="yr-table">
+            <thead>
+              <tr>
+                <th className="yr-th yr-th--month">Month</th>
+                <th className="yr-th yr-th--num">Income</th>
+                <th className="yr-th yr-th--num">Expenses</th>
+                <th className="yr-th yr-th--num">Net</th>
+                <th className="yr-th yr-th--num">Savings Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {yearlyData.map(row => (
+                <tr key={row.key} className={`yr-tr ${row.empty ? 'yr-tr--empty' : ''}`}>
+                  <td className="yr-td yr-td--month">{getMonthLabel(row.key)}</td>
+                  <td className="yr-td yr-td--num">{row.empty ? '—' : fmt(row.income)}</td>
+                  <td className="yr-td yr-td--num">{row.empty ? '—' : fmt(row.expenses)}</td>
+                  <td className="yr-td yr-td--num" style={{ color: row.empty ? undefined : row.net >= 0 ? 'var(--income)' : 'var(--expense)' }}>
+                    {row.empty ? '—' : (row.net < 0 ? '−' : '+') + fmt(Math.abs(row.net))}
+                  </td>
+                  <td className="yr-td yr-td--num">{row.empty ? '—' : `${row.savingsRate.toFixed(1)}%`}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="yr-tr yr-tr--total">
+                <td className="yr-td yr-td--month">Total</td>
+                <td className="yr-td yr-td--num">{fmt(yearlyTotals.income)}</td>
+                <td className="yr-td yr-td--num">{fmt(yearlyTotals.expenses)}</td>
+                <td className="yr-td yr-td--num" style={{ color: yearlyTotals.net >= 0 ? 'var(--income)' : 'var(--expense)' }}>
+                  {(yearlyTotals.net < 0 ? '−' : '+') + fmt(Math.abs(yearlyTotals.net))}
+                </td>
+                <td className="yr-td yr-td--num">{`${yearlyTotals.savingsRate.toFixed(1)}%`}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </GlassCard>
     </div>
   )
 }

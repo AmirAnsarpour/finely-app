@@ -6,7 +6,8 @@ export function formatCurrency(
   return `${symbol}${new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(Math.abs(amount))}`;
+    numberingSystem: 'latn',
+  } as Intl.NumberFormatOptions).format(Math.abs(amount))}`;
 }
 
 export function formatDate(dateStr: string): string {
@@ -71,7 +72,7 @@ export function getLast12Months(): string[] {
 }
 
 export function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return crypto.randomUUID()
 }
 
 export function yesterdayString(): string {

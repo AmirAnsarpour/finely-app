@@ -1,25 +1,26 @@
 import React, { useMemo } from 'react'
-import { TrendingUp, TrendingDown, Wallet, PiggyBank, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, PiggyBank, ArrowUpRight, ArrowDownRight, Sparkles } from 'lucide-react'
 import GlassCard from '../components/GlassCard'
 import TransactionItem from '../components/TransactionItem'
 import CategoryIcon from '../components/CategoryIcon'
 import SkeletonRow from '../components/SkeletonRow'
 import { MonthlyBarChart } from '../components/Chart'
 import type { UseDataReturn } from '../hooks/useData'
-import {
-  formatCurrency, getLast6Months, getMonthKey,
-  currentMonthKey, previousMonthKey
-} from '../utils/formatters'
+import { formatCurrency } from '../utils/formatters'
 import { useCalendar } from '../utils/calendarContext'
+import { useCountUp } from '../components/AnimatedNumber'
 
 interface Props { data: UseDataReturn }
 
 export default function Dashboard({ data }: Props) {
-  const { transactions, categories, settings, refreshing } = data
-  const { getMonthLabel } = useCalendar()
+  const { transactions, categories, settings, goals, installments, refreshing } = data
+  const {
+    getMonthKey, currentMonthKey, previousMonthKey,
+    getLast6Months, getMonthLabel,
+  } = useCalendar()
 
   const currentMonth = currentMonthKey()
-  const lastMonth = useMemo(() => previousMonthKey(currentMonth), [currentMonth])
+  const lastMonth = useMemo(() => previousMonthKey(currentMonth), [previousMonthKey, currentMonth])
 
   const monthlyTotals = useMemo(() => {
     const income = transactions.filter(t => t.type === 'income' && getMonthKey(t.date) === currentMonth).reduce((s, t) => s + t.amount, 0)
@@ -40,9 +41,9 @@ export default function Dashboard({ data }: Props) {
   const chartData = useMemo(() =>
     getLast6Months().map(month => ({
       month: getMonthLabel(month),
-      income: transactions.filter(t => t.type === 'income' && getMonthKey(t.date) === month).reduce((s, t) => s + t.amount, 0),
+      income:   transactions.filter(t => t.type === 'income'  && getMonthKey(t.date) === month).reduce((s, t) => s + t.amount, 0),
       expenses: transactions.filter(t => t.type === 'expense' && getMonthKey(t.date) === month).reduce((s, t) => s + t.amount, 0)
-    })), [transactions, getMonthLabel])
+    })), [transactions, getLast6Months, getMonthKey, getMonthLabel])
 
   const recentTransactions = useMemo(() =>
     [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10),
@@ -66,10 +67,25 @@ export default function Dashboard({ data }: Props) {
 
   const fmt = (n: number) => formatCurrency(n, settings.currencySymbol, settings.currencyLocale)
 
+  const netWorthData = useMemo(() => {
+    const liquidBalance = transactions.reduce((s, t) => t.type === 'income' ? s + t.amount : s - t.amount, 0)
+    const goalSavings = goals.reduce((s, g) => s + g.currentAmount, 0)
+    const remainingDebt = installments.reduce((s, inst) =>
+      s + inst.payments.filter(p => !p.isPaid).reduce((ps, p) => ps + p.amount, 0), 0)
+    const netWorth = liquidBalance + goalSavings - remainingDebt
+    return { liquidBalance, goalSavings, remainingDebt, netWorth }
+  }, [transactions, goals, installments])
+
+  // Animated values for stat cards
+  const animIncome   = useCountUp(monthlyTotals.income)
+  const animExpenses = useCountUp(monthlyTotals.expenses)
+  const animNet      = useCountUp(Math.abs(monthlyTotals.net))
+  const animSavings  = useCountUp(monthlyTotals.savingsRate)
+
   const summaryCards = [
     {
       label: 'Total Income',
-      value: fmt(monthlyTotals.income),
+      value: fmt(animIncome),
       icon: TrendingUp,
       color: 'var(--income)',
       bg: 'var(--income-dim)',
@@ -78,7 +94,7 @@ export default function Dashboard({ data }: Props) {
     },
     {
       label: 'Total Expenses',
-      value: fmt(monthlyTotals.expenses),
+      value: fmt(animExpenses),
       icon: TrendingDown,
       color: 'var(--expense)',
       bg: 'var(--expense-dim)',
@@ -87,7 +103,7 @@ export default function Dashboard({ data }: Props) {
     },
     {
       label: 'Net Balance',
-      value: fmt(Math.abs(monthlyTotals.net)),
+      value: fmt(animNet),
       icon: Wallet,
       color: monthlyTotals.net >= 0 ? 'var(--income)' : 'var(--expense)',
       bg: monthlyTotals.net >= 0 ? 'var(--income-dim)' : 'var(--expense-dim)',
@@ -97,7 +113,7 @@ export default function Dashboard({ data }: Props) {
     },
     {
       label: 'Savings Rate',
-      value: `${monthlyTotals.savingsRate.toFixed(1)}%`,
+      value: `${animSavings.toFixed(1)}%`,
       icon: PiggyBank,
       color: 'var(--accent)',
       bg: 'var(--accent-dim)',
@@ -114,6 +130,52 @@ export default function Dashboard({ data }: Props) {
           <p className="page-sub">Financial overview for {getMonthLabel(currentMonth)}</p>
         </div>
       </div>
+
+      {/* Net worth strip */}
+      {transactions.length > 0 && (
+        <GlassCard className="card-appear" style={{ marginBottom: 16 }}>
+          <div className="nw-strip">
+            <div className="nw-col">
+              <span className="nw-label">Liquid Balance</span>
+              <span className="nw-value">{fmt(netWorthData.liquidBalance)}</span>
+            </div>
+            <div className="nw-divider" />
+            <div className="nw-col">
+              <span className="nw-label">Goal Savings</span>
+              <span className="nw-value">{fmt(netWorthData.goalSavings)}</span>
+            </div>
+            <div className="nw-divider" />
+            <div className="nw-col">
+              <span className="nw-label">Remaining Debt</span>
+              <span className="nw-value">{fmt(netWorthData.remainingDebt)}</span>
+            </div>
+            <div className="nw-divider" />
+            <div className="nw-col">
+              <span className="nw-label">Net Worth</span>
+              <span className="nw-value" style={{ color: netWorthData.netWorth >= 0 ? 'var(--income)' : 'var(--expense)' }}>
+                {netWorthData.netWorth < 0 ? '−' : ''}{fmt(Math.abs(netWorthData.netWorth))}
+              </span>
+            </div>
+          </div>
+        </GlassCard>
+      )}
+
+      {/* Getting-started banner — only shown before any transactions exist */}
+      {transactions.length === 0 && !refreshing && (
+        <GlassCard className="card-appear" style={{ marginBottom: 16, borderColor: 'rgba(108,142,245,0.3)' }}>
+          <div className="gs-banner">
+            <div className="gs-banner__icon">
+              <Sparkles size={20} color="var(--accent)" />
+            </div>
+            <div className="gs-banner__body">
+              <p className="gs-banner__title">Welcome to Finely</p>
+              <p className="gs-banner__sub">
+                Your categories are ready. Press <kbd className="gs-kbd">Ctrl N</kbd> to log your first transaction — income or expense — and your dashboard will come to life.
+              </p>
+            </div>
+          </div>
+        </GlassCard>
+      )}
 
       {/* Summary cards */}
       <div className="summary-grid">
@@ -199,9 +261,11 @@ export default function Dashboard({ data }: Props) {
                 Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
               ) : recentTransactions.length === 0 ? (
                 <div className="empty-state">
-                  <Wallet size={36} color="var(--text-muted)" />
-                  <p>No transactions yet</p>
-                  <span>Use the sidebar to add one</span>
+                  <div className="empty-icon-ring">
+                    <Wallet size={22} color="var(--accent)" />
+                  </div>
+                  <p className="empty-title">No transactions yet</p>
+                  <span className="empty-hint">Press <kbd className="empty-kbd">Ctrl N</kbd> to add your first one</span>
                 </div>
               ) : (
                 recentTransactions.map((t, i) => (
@@ -213,52 +277,6 @@ export default function Dashboard({ data }: Props) {
         </div>
       </div>
 
-      <style>{`
-        .page-header { margin-bottom: 20px; }
-        .page-title {
-          font-size: 26px; font-weight: 700; letter-spacing: -0.5px;
-          background: linear-gradient(135deg, #e8eaff 0%, rgba(255,255,255,0.65) 100%);
-          -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-        }
-        .page-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
-
-        /* Summary cards */
-        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
-        @media (max-width: 1100px) { .summary-grid { grid-template-columns: repeat(2, 1fr); } }
-        .summary-card { display: flex; align-items: flex-start; gap: 12px; }
-        .sc-icon { width: 40px; height: 40px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .sc-body { flex: 1; min-width: 0; }
-        .sc-label { font-size: 11px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
-        .sc-value { font-size: 20px; font-weight: 700; margin: 4px 0 3px; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
-        .sc-footer { display: flex; align-items: center; gap: 4px; }
-        .sc-delta { display: flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 500; }
-        .sc-delta.good { color: var(--income); }
-        .sc-delta.bad  { color: var(--expense); }
-        .sc-sub { font-size: 11px; color: var(--text-secondary); }
-
-        /* Dashboard layout */
-        .dashboard-grid { display: grid; grid-template-columns: 1fr 360px; gap: 14px; }
-        @media (max-width: 1100px) { .dashboard-grid { grid-template-columns: 1fr; } }
-        .right-col { display: flex; flex-direction: column; gap: 0; }
-        .chart-card { min-height: 340px; }
-        .section-title { font-size: 14px; font-weight: 600; }
-        .section-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-        .tx-list { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; }
-        .empty-state { display: flex; flex-direction: column; align-items: center; padding: 36px 20px; gap: 8px; text-align: center; }
-        .empty-state p { font-size: 14px; font-weight: 500; color: var(--text-secondary); }
-        .empty-state span { font-size: 12px; color: var(--text-muted); }
-
-        /* Budget tracker */
-        .budget-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
-        .budget-row { display: flex; align-items: center; gap: 10px; }
-        .budget-info { flex: 1; }
-        .budget-top { display: flex; justify-content: space-between; margin-bottom: 5px; }
-        .budget-name { font-size: 12px; font-weight: 500; color: var(--text-primary); }
-        .budget-amt { font-size: 11px; font-variant-numeric: tabular-nums; }
-        .budget-track { height: 5px; background: var(--glass-bg); border-radius: 3px; overflow: hidden; }
-        .budget-fill { height: 100%; border-radius: 3px; transition: width 0.6s var(--ease-out); }
-        .recent-card { flex: 1; }
-      `}</style>
     </div>
   )
 }
