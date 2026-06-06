@@ -19,9 +19,10 @@ module.exports = {
       to: "src/renderer/assets/finely.png",
     },
   ],
+
   win: {
     target: [
-      { target: "nsis", arch: ["x64"] },
+      { target: "nsis",     arch: ["x64"] },
       { target: "portable", arch: ["x64"] },
     ],
     icon: "src/renderer/assets/finely.png",
@@ -30,9 +31,18 @@ module.exports = {
     oneClick: false,
     allowToChangeInstallationDirectory: true,
     deleteAppDataOnUninstall: false,
+    artifactName: "Finely-${version}-setup.exe",
   },
+  portable: {
+    artifactName: "Finely-${version}-portable.exe",
+  },
+
   linux: {
-    target: [{ target: "AppImage", arch: ["x64"] }],
+    target: [
+      { target: "AppImage", arch: ["x64"] },
+      { target: "deb",      arch: ["x64"] },
+      { target: "rpm",      arch: ["x64"] },
+    ],
     icon: "src/renderer/assets/finely.png",
     category: "Office",
     synopsis: "Personal income & expense tracker",

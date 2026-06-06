@@ -1,10 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FolderOpen,
   Upload,
   Download,
   Github,
   ExternalLink,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import Select from "../components/Select";
 import GlassCard from "../components/GlassCard";
@@ -17,12 +20,67 @@ interface Props {
   data: UseDataReturn;
 }
 
+type UpdateState = "idle" | "checking" | "no-update" | "available" | "downloading" | "applying" | "error";
+
+const isWindows = window.electronAPI.platform === "win32";
+
 export default function Settings({ data }: Props) {
   const { settings, updateSettings, exportZip, importZip, selectFolder } = data;
   const { toast } = useToast();
   const [browsing, setBrowsing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+
+  const [appVersion, setAppVersion] = useState("");
+  const [updateState, setUpdateState] = useState<UpdateState>("idle");
+  const [latestVersion, setLatestVersion] = useState("");
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [updateError, setUpdateError] = useState("");
+
+  useEffect(() => {
+    window.electronAPI.getAppVersion().then(setAppVersion);
+  }, []);
+
+  useEffect(() => {
+    if (!isWindows) return;
+    const unsub = window.electronAPI.onUpdateProgress((pct) => {
+      setDownloadProgress(pct);
+    });
+    return unsub;
+  }, []);
+
+  const handleCheckUpdate = async () => {
+    setUpdateState("checking");
+    setUpdateError("");
+    try {
+      const info = await window.electronAPI.checkForUpdate();
+      if (info.hasUpdate && info.downloadUrl) {
+        setLatestVersion(info.latestVersion);
+        setDownloadUrl(info.downloadUrl);
+        setUpdateState("available");
+      } else {
+        setUpdateState("no-update");
+      }
+    } catch (e) {
+      setUpdateError(e instanceof Error ? e.message : "Could not reach update server");
+      setUpdateState("error");
+    }
+  };
+
+  const handleDownloadAndApply = async () => {
+    if (!downloadUrl) return;
+    setUpdateState("downloading");
+    setDownloadProgress(0);
+    try {
+      const tempPath = await window.electronAPI.downloadUpdate(downloadUrl);
+      setUpdateState("applying");
+      await window.electronAPI.applyUpdate(tempPath);
+    } catch (e) {
+      setUpdateError(e instanceof Error ? e.message : "Download failed");
+      setUpdateState("error");
+    }
+  };
 
   const handleCurrencyChange = async (code: string) => {
     const cur = CURRENCIES.find((c) => c.code === code);
@@ -288,7 +346,7 @@ export default function Settings({ data }: Props) {
           <div className="about-info">
             <div className="about-row">
               <span className="about-label">Version</span>
-              <span className="about-value">1.0.0</span>
+              <span className="about-value">{appVersion || "…"}</span>
             </div>
             <div className="about-row">
               <span className="about-label">Data format</span>
@@ -326,6 +384,109 @@ export default function Settings({ data }: Props) {
             </div>
           </div>
         </GlassCard>
+
+        {/* Update — Windows portable only */}
+        {isWindows && (
+          <GlassCard className="card-appear">
+            <h2 className="section-title">Updates</h2>
+            <p className="section-sub">Keep Finely up to date automatically</p>
+            <div className="settings-section">
+              <div className="update-item">
+                <div
+                  className="backup-icon"
+                  style={{
+                    background:
+                      updateState === "error"
+                        ? "var(--expense-dim)"
+                        : updateState === "no-update"
+                          ? "var(--income-dim)"
+                          : "var(--accent-dim)",
+                  }}
+                >
+                  {updateState === "error" ? (
+                    <AlertCircle size={18} color="var(--expense)" />
+                  ) : updateState === "no-update" ? (
+                    <CheckCircle2 size={18} color="var(--income)" />
+                  ) : (
+                    <RefreshCw
+                      size={18}
+                      color="var(--accent)"
+                      style={
+                        updateState === "checking" || updateState === "downloading" || updateState === "applying"
+                          ? { animation: "spin 1s linear infinite" }
+                          : undefined
+                      }
+                    />
+                  )}
+                </div>
+
+                <div className="backup-info">
+                  <p className="setting-name">
+                    {updateState === "idle" && "Check for Updates"}
+                    {updateState === "checking" && "Checking…"}
+                    {updateState === "no-update" && "Up to Date"}
+                    {updateState === "available" && `v${latestVersion} Available`}
+                    {updateState === "downloading" && `Downloading… ${downloadProgress}%`}
+                    {updateState === "applying" && "Applying Update…"}
+                    {updateState === "error" && "Update Failed"}
+                  </p>
+                  <p className="setting-desc">
+                    {updateState === "idle" && `Current version: ${appVersion || "…"}`}
+                    {updateState === "checking" && "Contacting GitHub releases…"}
+                    {updateState === "no-update" && `You're on the latest version`}
+                    {updateState === "available" && "Ready to download and install"}
+                    {updateState === "downloading" && "App will restart automatically when done"}
+                    {updateState === "applying" && "Restarting shortly — do not close the app"}
+                    {updateState === "error" && updateError}
+                  </p>
+                  {updateState === "downloading" && (
+                    <div className="update-progress-track">
+                      <div
+                        className="update-progress-fill"
+                        style={{ width: `${downloadProgress}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {updateState === "idle" && (
+                  <button className="btn-secondary" onClick={handleCheckUpdate}>
+                    <RefreshCw size={15} />
+                    Check
+                  </button>
+                )}
+                {updateState === "no-update" && (
+                  <button
+                    className="btn-secondary"
+                    onClick={() => setUpdateState("idle")}
+                  >
+                    <RefreshCw size={15} />
+                    Recheck
+                  </button>
+                )}
+                {updateState === "available" && (
+                  <button
+                    className="btn-secondary"
+                    onClick={handleDownloadAndApply}
+                    style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+                  >
+                    <Download size={15} />
+                    Update
+                  </button>
+                )}
+                {updateState === "error" && (
+                  <button
+                    className="btn-secondary"
+                    onClick={() => setUpdateState("idle")}
+                  >
+                    <RefreshCw size={15} />
+                    Retry
+                  </button>
+                )}
+              </div>
+            </div>
+          </GlassCard>
+        )}
       </div>
     </div>
   );

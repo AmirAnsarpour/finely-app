@@ -651,3 +651,9 @@
 .about-link-btn span { flex: 1; }
 .about-link-ext { color: var(--text-muted); flex-shrink: 0; transition: color var(--transition); }
 .about-link-btn:hover .about-link-ext { color: var(--text-secondary); }
+
+/* ── Update card ─────────────────────────────────────────────── */
+.update-item { display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); }
+.update-progress-track { height: 4px; background: var(--glass-bg-hover); border-radius: 2px; overflow: hidden; margin-top: 8px; }
+.update-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s ease; }
+@keyframes spin { to { transform: rotate(360deg); } }

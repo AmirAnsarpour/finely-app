@@ -1,0 +1,104 @@
+name: Release
+
+# Triggered by pushing a version tag, e.g. `git tag v1.2.0 && git push --tags`
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+# Write permission is required to create releases and upload assets
+permissions:
+  contents: write
+
+# Prevent two release runs for the same tag from racing each other
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+
+  # ── 1. Create the GitHub Release ────────────────────────────────────────────
+  # Runs first so the release object exists before the build jobs try to upload
+  # artifacts to it. Auto-generates release notes from commits since last tag.
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+
+  # ── 2. Windows — NSIS installer + portable exe ──────────────────────────────
+  build-windows:
+    name: Windows (NSIS installer + portable)
+    needs: create-release
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: windows-node_modules-${{ hashFiles('bun.lock') }}
+          restore-keys: windows-node_modules-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Compile TypeScript
+        run: bun run build
+
+      - name: Package and publish Windows artifacts
+        run: bunx electron-builder --win --publish always --config electron-builder.config.js
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── 3. Linux — AppImage + deb + rpm ─────────────────────────────────────────
+  build-linux:
+    name: Linux (AppImage + deb + rpm)
+    needs: create-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: linux-node_modules-${{ hashFiles('bun.lock') }}
+          restore-keys: linux-node_modules-
+
+      - name: Install Linux packaging tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends rpm-build fakeroot
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Compile TypeScript
+        run: bun run build
+
+      - name: Package and publish Linux artifacts
+        # APPIMAGE_EXTRACT_AND_RUN avoids needing FUSE on the CI runner
+        run: bunx electron-builder --linux --publish always --config electron-builder.config.js
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPIMAGE_EXTRACT_AND_RUN: "1"

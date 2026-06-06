@@ -1,3 +1,10 @@
+interface UpdateInfo {
+  hasUpdate: boolean
+  latestVersion: string
+  currentVersion: string
+  downloadUrl: string | null
+}
+
 interface ElectronAPI {
   readData: (file: string) => Promise<unknown>
   writeData: (file: string, data: unknown) => Promise<boolean>
@@ -12,6 +19,13 @@ interface ElectronAPI {
   windowMinimize: () => void
   windowMaximize: () => void
   windowClose: () => void
+
+  platform: string
+  getAppVersion: () => Promise<string>
+  checkForUpdate: () => Promise<UpdateInfo>
+  downloadUpdate: (url: string) => Promise<string>
+  applyUpdate: (tempPath: string) => Promise<void>
+  onUpdateProgress: (cb: (pct: number) => void) => () => void
 }
 
 declare global {

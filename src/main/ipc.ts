@@ -1,4 +1,5 @@
 import { ipcMain, dialog, app, BrowserWindow, shell, Notification } from 'electron'
+import { checkForUpdate, downloadUpdate, applyUpdateAndRestart } from './updater'
 import { join } from 'path'
 import fs from 'fs'
 import path from 'path'
@@ -168,6 +169,20 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('open-external', async (_event, url: string) => {
     await shell.openExternal(url)
+  })
+
+  ipcMain.handle('get-app-version', () => app.getVersion())
+
+  ipcMain.handle('update-check', () => checkForUpdate())
+
+  ipcMain.handle('update-download', async (event, url: string) => {
+    return downloadUpdate(url, (pct) => {
+      event.sender.send('update-progress', pct)
+    })
+  })
+
+  ipcMain.handle('update-apply', (_event, tempPath: string) => {
+    applyUpdateAndRestart(tempPath)
   })
 
   ipcMain.on('window-minimize', () => BrowserWindow.getFocusedWindow()?.minimize())
