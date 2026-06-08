@@ -2,7 +2,7 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, ArrowLeftRight, Tag,
-  BarChart3, Settings, Minus, Square, X, Plus, CreditCard, Target
+  BarChart3, Settings, Minus, Square, X, Plus, CreditCard, Target, TrendingUp
 } from 'lucide-react'
 import logoUrl from '../assets/finely.png'
 
@@ -13,6 +13,7 @@ const MAIN_NAV = [
   { to: '/reports', icon: BarChart3, label: 'Reports' },
   { to: '/installments', icon: CreditCard, label: 'Installments' },
   { to: '/goals', icon: Target, label: 'Goals' },
+  { to: '/investments', icon: TrendingUp, label: 'Investment' },
 ]
 
 interface SidebarProps {

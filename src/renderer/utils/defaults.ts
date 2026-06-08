@@ -28,4 +28,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   dataFolder: '',
   calendarType: 'gregorian',
   weekStartDay: 0,
+  investmentCurrency: 'USDT',
 }

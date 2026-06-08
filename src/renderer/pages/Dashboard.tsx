@@ -9,11 +9,13 @@ import type { UseDataReturn } from '../hooks/useData'
 import { formatCurrency } from '../utils/formatters'
 import { useCalendar } from '../utils/calendarContext'
 import { useCountUp } from '../components/AnimatedNumber'
+import { useInvestmentPrices } from '../hooks/useInvestmentPrices'
+import { formatPriceValue } from '../utils/investmentPricing'
 
 interface Props { data: UseDataReturn }
 
 export default function Dashboard({ data }: Props) {
-  const { transactions, categories, settings, goals, installments, refreshing } = data
+  const { transactions, categories, settings, goals, installments, investments, refreshing } = data
   const {
     getMonthKey, currentMonthKey, previousMonthKey,
     getLast6Months, getMonthLabel,
@@ -76,6 +78,20 @@ export default function Dashboard({ data }: Props) {
     return { liquidBalance, goalSavings, remainingDebt, netWorth }
   }, [transactions, goals, installments])
 
+  const investmentCurrency = settings.investmentCurrency
+  const { prices: investmentPrices } = useInvestmentPrices(investments, investmentCurrency)
+  const portfolioValue = useMemo(() => {
+    let total = 0
+    let hasAny = false
+    for (const inv of investments) {
+      const price = investmentPrices[inv.assetId]
+      if (price == null) continue
+      total += inv.quantity * price
+      hasAny = true
+    }
+    return hasAny ? total : null
+  }, [investments, investmentPrices])
+
   // Animated values for stat cards
   const animIncome   = useCountUp(monthlyTotals.income)
   const animExpenses = useCountUp(monthlyTotals.expenses)
@@ -132,7 +148,7 @@ export default function Dashboard({ data }: Props) {
       </div>
 
       {/* Net worth strip */}
-      {transactions.length > 0 && (
+      {(transactions.length > 0 || investments.length > 0) && (
         <GlassCard className="card-appear" style={{ marginBottom: 16 }}>
           <div className="nw-strip">
             <div className="nw-col">
@@ -156,6 +172,17 @@ export default function Dashboard({ data }: Props) {
                 {netWorthData.netWorth < 0 ? '−' : ''}{fmt(Math.abs(netWorthData.netWorth))}
               </span>
             </div>
+            {investments.length > 0 && (
+              <>
+                <div className="nw-divider" />
+                <div className="nw-col">
+                  <span className="nw-label">Portfolio Value</span>
+                  <span className="nw-value" style={portfolioValue == null ? { color: 'var(--text-muted)' } : undefined}>
+                    {portfolioValue == null ? '—' : formatPriceValue(portfolioValue, investmentCurrency)}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </GlassCard>
       )}

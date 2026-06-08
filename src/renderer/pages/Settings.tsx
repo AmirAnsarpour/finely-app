@@ -250,6 +250,25 @@ export default function Settings({ data }: Props) {
                 />
               </div>
             </div>
+
+            <div className="setting-row">
+              <div>
+                <p className="setting-name">Investment Value Display</p>
+                <p className="setting-desc">
+                  Currency used to show your portfolio's estimated value
+                </p>
+              </div>
+              <div style={{ minWidth: 220 }}>
+                <Select
+                  value={settings.investmentCurrency}
+                  onChange={(v) => updateSettings({ investmentCurrency: v as 'IRT' | 'USDT' })}
+                  options={[
+                    { value: 'USDT', label: 'USDT (USD equivalent)' },
+                    { value: 'IRT', label: 'Toman (IRT)' },
+                  ]}
+                />
+              </div>
+            </div>
           </div>
         </GlassCard>
 

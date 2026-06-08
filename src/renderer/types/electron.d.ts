@@ -16,6 +16,7 @@ interface ElectronAPI {
   importZip: () => Promise<boolean>
   openExternal: (url: string) => Promise<void>
   showNotification: (data: { title: string; body: string }) => Promise<boolean>
+  fetchMarketPrice: (symbol: string) => Promise<{ lastTradePrice: string } | null>
   windowMinimize: () => void
   windowMaximize: () => void
   windowClose: () => void

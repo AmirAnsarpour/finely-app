@@ -3,7 +3,8 @@ import {
   Briefcase, Code2, TrendingUp, Gift, DollarSign,
   Utensils, Car, ShoppingBag, Home, Film, Heart,
   BookOpen, Zap, MoreHorizontal, Tag, Wallet, Plane,
-  Coffee, Music, Gamepad2, Baby, Dumbbell, PiggyBank
+  Coffee, Music, Gamepad2, Baby, Dumbbell, PiggyBank,
+  Bitcoin, Coins, Gem, Banknote
 } from 'lucide-react'
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -30,6 +31,10 @@ const ICON_MAP: Record<string, React.ElementType> = {
   'baby': Baby,
   'dumbbell': Dumbbell,
   'piggy-bank': PiggyBank,
+  'bitcoin': Bitcoin,
+  'coins': Coins,
+  'gem': Gem,
+  'banknote': Banknote,
 }
 
 export const AVAILABLE_ICONS = Object.keys(ICON_MAP)

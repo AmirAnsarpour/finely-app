@@ -617,6 +617,53 @@
 .goals-section__count { background: var(--glass-bg-hover); border: 1px solid var(--glass-border); border-radius: 10px; padding: 1px 7px; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: none; letter-spacing: 0; }
 .goals-grid { display: flex; flex-direction: column; gap: 10px; }
 
+/* ── Investments ───────────────────────────────────────────── */
+.inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; }
+
+.inv-card { display: flex; overflow: hidden; padding: 0; }
+.inv-card__accent { width: 4px; flex-shrink: 0; }
+.inv-card__body { flex: 1; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.inv-card__top { display: flex; align-items: flex-start; gap: 12px; }
+.inv-card__meta { flex: 1; min-width: 0; }
+.inv-card__name { font-size: 15px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inv-card__sym { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.inv-card__balance { display: flex; align-items: baseline; gap: 6px; }
+.inv-card__qty { font-size: 22px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.inv-card__unit { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+.inv-card__stats { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); }
+.inv-card__stat { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.inv-card__stat-label { font-size: 11px; color: var(--text-muted); }
+.inv-card__stat-value { font-size: 13px; font-weight: 600; color: var(--text-secondary); font-variant-numeric: tabular-nums; text-align: right; }
+.inv-card__stat-value--total { color: var(--text-primary); font-weight: 700; }
+.inv-card__history { display: flex; align-items: center; gap: 6px; padding: 0; background: transparent; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer; transition: color var(--transition); }
+.inv-card__history:hover { color: var(--text-secondary); }
+.inv-card__history svg:last-child { margin-left: auto; }
+.inv-card__add { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 7px 12px; border-radius: var(--radius-sm); background: transparent; border: 1px solid; font-size: 12px; font-weight: 600; cursor: pointer; transition: opacity var(--transition); }
+.inv-card__add:hover { opacity: 0.75; }
+
+/* Compact buy/sell transaction form */
+.itx-row { display: flex; gap: 12px; }
+.itx-row__type { flex: 0 0 auto; }
+.itx-row__qty { flex: 1; }
+.itx-qty-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.itx-sell-all { padding: 0; background: transparent; border: none; color: var(--accent); font-size: 11px; font-weight: 600; cursor: pointer; transition: opacity var(--transition); }
+.itx-sell-all:hover { opacity: 0.7; }
+.itx-balance { font-size: 12px; color: var(--text-muted); margin: -6px 0 0; }
+.itx-balance strong { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.seg-toggle { display: flex; gap: 4px; padding: 3px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); }
+.seg-btn { padding: 8px 16px; border-radius: var(--radius-sm); background: transparent; border: none; color: var(--text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; transition: all var(--transition); }
+.seg-btn--buy.seg-btn--active { background: var(--income-dim); color: var(--income); }
+.seg-btn--sell.seg-btn--active { background: var(--expense-dim); color: var(--expense); }
+.btn-primary--sell { background: var(--expense); }
+
+.inv-history { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; }
+.inv-history__row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); }
+.inv-history__icon { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.inv-history__main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.inv-history__qty { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.inv-history__date { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* ── Settings ──────────────────────────────────────────────── */
 .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 900px) { .settings-grid { grid-template-columns: 1fr; } }

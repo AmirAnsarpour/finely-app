@@ -8,6 +8,7 @@ import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import Installments from './pages/Installments'
 import Goals from './pages/Goals'
+import Investments from './pages/Investments'
 import Modal from './components/Modal'
 import TransactionForm from './pages/TransactionForm'
 import { useData } from './hooks/useData'
@@ -232,6 +233,7 @@ function AppShell() {
           <Route path="/settings" element={<Settings data={data} />} />
           <Route path="/installments" element={<Installments data={data} />} />
           <Route path="/goals" element={<Goals data={data} />} />
+          <Route path="/investments" element={<Investments data={data} />} />
         </Routes>
       </main>
 

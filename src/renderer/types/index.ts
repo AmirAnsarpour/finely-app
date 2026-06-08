@@ -27,6 +27,7 @@ export interface AppSettings {
   onboardingComplete?: boolean
   calendarType?: 'gregorian' | 'jalali'
   weekStartDay?: 0 | 1 | 6   // 0=Sun, 1=Mon, 6=Sat
+  investmentCurrency: 'IRT' | 'USDT'
 }
 
 export interface InstallmentPayment {
@@ -60,6 +61,26 @@ export interface Goal {
   icon: string
   deadline?: string   // ISO date, optional
   notes?: string
+  createdAt: string
+}
+
+export type InvestmentAssetType = 'crypto' | 'gold' | 'fiat'
+export type InvestmentTransactionType = 'buy' | 'sell'
+
+export interface InvestmentTransaction {
+  id: string
+  type: InvestmentTransactionType
+  quantity: number    // always positive — the sign is derived from `type`
+  date: string        // ISO date of the transaction
+  note?: string
+  createdAt: string
+}
+
+export interface Investment {
+  id: string
+  assetId: string     // references an entry in INVESTMENT_ASSETS
+  quantity: number    // current balance, kept in sync with the transaction history
+  transactions: InvestmentTransaction[]
   createdAt: string
 }
 

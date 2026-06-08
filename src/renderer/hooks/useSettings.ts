@@ -21,7 +21,13 @@ export function useSettings() {
         fileManager.getDataFolder(),
       ])
       const resolved: AppSettings = settingsData
-        ? { ...DEFAULT_SETTINGS, ...settingsData, dataFolder }
+        ? {
+            ...DEFAULT_SETTINGS,
+            ...settingsData,
+            investmentCurrency: settingsData.investmentCurrency
+              ?? (settingsData.currency === 'IRT' ? 'IRT' : 'USDT'),
+            dataFolder,
+          }
         : { ...DEFAULT_SETTINGS, dataFolder }
       setSettings(resolved)
       if (!settingsData) await fileManager.writeSettings(resolved)

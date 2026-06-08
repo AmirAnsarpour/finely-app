@@ -49,7 +49,8 @@ const FILE_MAP: Record<string, string> = {
   categories: 'categories.json',
   settings: 'settings.json',
   installments: 'installments.json',
-  goals: 'goals.json'
+  goals: 'goals.json',
+  investments: 'investments.json'
 }
 
 function ensureDataFolder(): void {
@@ -169,6 +170,20 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('open-external', async (_event, url: string) => {
     await shell.openExternal(url)
+  })
+
+  // Fetches the last traded price for a Nobitex market symbol (e.g. "BTCUSDT", "BTCIRT").
+  // Runs in the main process so the renderer's CSP doesn't need to allow external hosts.
+  ipcMain.handle('fetch-market-price', async (_event, symbol: string) => {
+    try {
+      const res = await fetch(`https://apiv2.nobitex.ir/v3/orderbook/${symbol}`)
+      if (!res.ok) return null
+      const data = await res.json()
+      if (data?.status !== 'ok' || typeof data?.lastTradePrice !== 'string') return null
+      return { lastTradePrice: data.lastTradePrice as string }
+    } catch {
+      return null
+    }
   })
 
   ipcMain.handle('get-app-version', () => app.getVersion())

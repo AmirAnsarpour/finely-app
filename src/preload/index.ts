@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportZip: () => ipcRenderer.invoke('export-zip'),
   importZip: () => ipcRenderer.invoke('import-zip'),
   showNotification: (data: { title: string; body: string }) => ipcRenderer.invoke('show-notification', data),
+  fetchMarketPrice: (symbol: string) => ipcRenderer.invoke('fetch-market-price', symbol),
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
   windowMinimize: () => ipcRenderer.send('window-minimize'),
   windowMaximize: () => ipcRenderer.send('window-maximize'),

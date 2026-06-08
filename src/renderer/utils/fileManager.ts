@@ -1,4 +1,4 @@
-import type { Transaction, Category, AppSettings, Installment, Goal } from '../types'
+import type { Transaction, Category, AppSettings, Installment, Goal, Investment } from '../types'
 
 export const fileManager = {
   async readTransactions(): Promise<Transaction[]> {
@@ -68,6 +68,15 @@ export const fileManager = {
 
   async writeGoals(data: Goal[]): Promise<void> {
     await window.electronAPI.writeData('goals', data)
+  },
+
+  async readInvestments(): Promise<Investment[]> {
+    const data = await window.electronAPI.readData('investments')
+    return Array.isArray(data) ? data : []
+  },
+
+  async writeInvestments(data: Investment[]): Promise<void> {
+    await window.electronAPI.writeData('investments', data)
   },
 
   async showNotification(title: string, body: string): Promise<void> {
