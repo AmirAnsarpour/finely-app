@@ -279,9 +279,9 @@ function GoalCard({
             {goal.notes && <p className="gc-notes">{goal.notes}</p>}
           </div>
           <div className="gc-pct-ring">
-            <ProgressRing pct={pct} color={isComplete ? '#4ade80' : goal.color} size={56} />
+            <ProgressRing pct={pct} color={isComplete ? '#4ade80' : goal.color} size={46} />
             <span className="gc-pct-label" style={{ color: isComplete ? '#4ade80' : goal.color }}>
-              {isComplete ? <CheckCircle2 size={16} /> : `${Math.round(pct)}%`}
+              {isComplete ? <CheckCircle2 size={14} /> : `${Math.round(pct)}%`}
             </span>
           </div>
         </div>

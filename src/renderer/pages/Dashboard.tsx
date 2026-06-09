@@ -18,7 +18,7 @@ export default function Dashboard({ data }: Props) {
   const { transactions, categories, settings, goals, installments, investments, refreshing } = data
   const {
     getMonthKey, currentMonthKey, previousMonthKey,
-    getLast6Months, getMonthLabel,
+    getLast6Months, getMonthLabel, formatMonthYear,
   } = useCalendar()
 
   const currentMonth = currentMonthKey()
@@ -143,7 +143,7 @@ export default function Dashboard({ data }: Props) {
       <div className="page-header">
         <div>
           <h1 className="page-title">Dashboard</h1>
-          <p className="page-sub">Financial overview for {getMonthLabel(currentMonth)}</p>
+          <p className="page-sub">Financial overview for {formatMonthYear(currentMonth)}</p>
         </div>
       </div>
 

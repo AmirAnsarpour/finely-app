@@ -73,6 +73,7 @@ export interface InvestmentTransaction {
   quantity: number    // always positive — the sign is derived from `type`
   date: string        // ISO date of the transaction
   note?: string
+  valueTomanAtTime?: number  // total Toman value of this transaction, captured at the moment it was recorded (absent for older entries recorded before this was tracked)
   createdAt: string
 }
 

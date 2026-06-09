@@ -16,14 +16,19 @@ module.exports = {
   extraResources: [
     {
       from: "src/renderer/assets/finely.png",
-      to: "src/renderer/assets/finely.png",
+      to: "finely.png",
     },
   ],
 
   win: {
+    // Portable is the primary Windows artifact — it's what the in-app
+    // updater fetches (see checkForUpdate in src/main/updater.ts), and it
+    // requires no installation step. NSIS remains available as a secondary
+    // option for users who prefer a traditional installer with Start Menu
+    // integration.
     target: [
-      { target: "nsis",     arch: ["x64"] },
       { target: "portable", arch: ["x64"] },
+      { target: "nsis",     arch: ["x64"] },
     ],
     icon: "src/renderer/assets/finely.png",
   },

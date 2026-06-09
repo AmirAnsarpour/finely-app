@@ -6,14 +6,36 @@ import {
 } from 'lucide-react'
 import logoUrl from '../assets/finely.png'
 
-const MAIN_NAV = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/transactions', icon: ArrowLeftRight, label: 'Transactions' },
-  { to: '/categories', icon: Tag, label: 'Categories' },
-  { to: '/reports', icon: BarChart3, label: 'Reports' },
-  { to: '/installments', icon: CreditCard, label: 'Installments' },
-  { to: '/goals', icon: Target, label: 'Goals' },
-  { to: '/investments', icon: TrendingUp, label: 'Investment' },
+// Grouped by purpose so the hierarchy reads top-to-bottom: get an overview,
+// manage day-to-day money, dig into analysis, then plan ahead.
+const NAV_GROUPS = [
+  {
+    label: 'Overview',
+    items: [
+      { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    ],
+  },
+  {
+    label: 'Manage',
+    items: [
+      { to: '/transactions', icon: ArrowLeftRight, label: 'Transactions' },
+      { to: '/categories', icon: Tag, label: 'Categories' },
+    ],
+  },
+  {
+    label: 'Insights',
+    items: [
+      { to: '/reports', icon: BarChart3, label: 'Reports' },
+    ],
+  },
+  {
+    label: 'Planning',
+    items: [
+      { to: '/goals', icon: Target, label: 'Goals' },
+      { to: '/installments', icon: CreditCard, label: 'Installments' },
+      { to: '/investments', icon: TrendingUp, label: 'Investment' },
+    ],
+  },
 ]
 
 interface SidebarProps {
@@ -49,24 +71,29 @@ export default function Sidebar({ onOpenAdd, budgetAlertCount = 0, installmentAl
         <button className="sidebar__cta" onClick={onOpenAdd}>
           <Plus size={15} strokeWidth={2.5} />
           <span>Add Transaction</span>
-          <kbd className="sidebar__kbd">^N</kbd>
+
         </button>
       </div>
 
       {/* Main nav */}
       <nav className="sidebar__nav">
-        {MAIN_NAV.map(({ to, icon: Icon, label }) => (
-          <NavLink key={to} to={to} end={to === '/'}
-            className={({ isActive }) => `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`}>
-            <Icon size={17} strokeWidth={2} />
-            <span>{label}</span>
-            {to === '/reports' && budgetAlertCount > 0 && (
-              <span className="sidebar__badge">{budgetAlertCount}</span>
-            )}
-            {to === '/installments' && installmentAlertCount > 0 && (
-              <span className="sidebar__badge sidebar__badge--accent">{installmentAlertCount}</span>
-            )}
-          </NavLink>
+        {NAV_GROUPS.map(group => (
+          <div key={group.label} className="sidebar__group">
+            <span className="sidebar__section-label">{group.label}</span>
+            {group.items.map(({ to, icon: Icon, label }) => (
+              <NavLink key={to} to={to} end={to === '/'}
+                className={({ isActive }) => `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`}>
+                <Icon size={17} strokeWidth={2} />
+                <span>{label}</span>
+                {to === '/reports' && budgetAlertCount > 0 && (
+                  <span className="sidebar__badge">{budgetAlertCount}</span>
+                )}
+                {to === '/installments' && installmentAlertCount > 0 && (
+                  <span className="sidebar__badge sidebar__badge--accent">{installmentAlertCount}</span>
+                )}
+              </NavLink>
+            ))}
+          </div>
         ))}
 
         <div className="sidebar__spacer" />

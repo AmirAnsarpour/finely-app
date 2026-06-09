@@ -92,8 +92,12 @@ export function formatJalaliShort(iso: string): string {
 }
 
 export function formatJalaliMonthYear(iso: string): string {
-  const fullIso = iso.length === 7 ? iso + '-01' : iso
-  const [jy, jm] = isoToJalali(fullIso)
+  if (iso.length === 7) {
+    // Jalali month key like "1405-03" — parse directly, don't convert
+    const [jy, jm] = iso.split('-').map(Number)
+    return `${JALALI_MONTHS[jm - 1]} ${jy}`
+  }
+  const [jy, jm] = isoToJalali(iso)
   return `${JALALI_MONTHS[jm - 1]} ${jy}`
 }
 

@@ -49,7 +49,7 @@ export async function fetchAssetPrice(asset: InvestmentAssetDef, currency: Price
 
 export function formatPriceValue(value: number, currency: PriceCurrency): string {
   if (currency === 'IRT') {
-    return `${Math.round(value).toLocaleString('en-US')} Toman`
+    return `T ${Math.round(value).toLocaleString('en-US')}`
   }
   return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }

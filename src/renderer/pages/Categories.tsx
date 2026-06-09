@@ -1,15 +1,22 @@
-import React, { useState } from 'react'
-import { Plus, Pencil, Trash2, Tag } from 'lucide-react'
+import React, { useState, useRef } from 'react'
+import { Plus, Pencil, Trash2, Tag, GripVertical } from 'lucide-react'
 import GlassCard from '../components/GlassCard'
 import CategoryIcon, { AVAILABLE_ICONS } from '../components/CategoryIcon'
 import Modal from '../components/Modal'
 import ColorPicker, { DEFAULT_COLOR_PRESETS } from '../components/ColorPicker'
 import { normalizeDigits } from '../utils/numerals'
+import { formatCurrency } from '../utils/formatters'
 import type { Category } from '../types'
 import type { UseDataReturn } from '../hooks/useData'
 import { useToast } from '../components/Toast'
 
 interface Props { data: UseDataReturn }
+
+// "Other Income" / "Other Expense" are always pinned to the bottom of their list.
+function isOther(c: Category) {
+  const n = c.name.trim().toLowerCase()
+  return n === 'other income' || n === 'other expense'
+}
 
 function CategoryForm({
   type,
@@ -68,7 +75,6 @@ function CategoryForm({
           ))}
         </div>
       </div>
-      {/* Monthly budget (expense only) */}
       {type === 'expense' && (
         <div className="form-group">
           <label className="form-label">Monthly Budget <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
@@ -82,8 +88,6 @@ function CategoryForm({
           />
         </div>
       )}
-
-      {/* Preview */}
       <div className="cat-preview">
         <CategoryIcon icon={icon} color={color} size={18} showBg bgSize={40} />
         <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{name || 'Preview'}</span>
@@ -100,7 +104,6 @@ function CategoryForm({
           {saving ? 'Saving…' : initial ? 'Save Changes' : 'Add Category'}
         </button>
       </div>
-
     </form>
   )
 }
@@ -111,7 +114,8 @@ function CategoryList({
   categories,
   onAdd,
   onEdit,
-  onDelete
+  onDelete,
+  onReorder,
 }: {
   title: string
   type: 'income' | 'expense'
@@ -119,9 +123,42 @@ function CategoryList({
   onAdd: () => void
   onEdit: (c: Category) => void
   onDelete: (id: string) => void
+  onReorder: (reordered: Category[]) => void
 }) {
   const color = type === 'income' ? 'var(--income)' : 'var(--expense)'
-  const bg = type === 'income' ? 'var(--income-dim)' : 'var(--expense-dim)'
+  const bg    = type === 'income' ? 'var(--income-dim)' : 'var(--expense-dim)'
+
+  const moveable = categories.filter(c => !isOther(c))
+  const pinned   = categories.filter(c => isOther(c))
+
+  // Drag-and-drop state — indices refer to positions within `moveable` only
+  const dragIdx     = useRef<number | null>(null)
+  const [dropIdx, setDropIdx] = useState<number | null>(null)
+
+  function handleDragStart(idx: number) {
+    dragIdx.current = idx
+  }
+
+  function handleDragOver(e: React.DragEvent, idx: number) {
+    e.preventDefault()
+    if (dragIdx.current !== null && dragIdx.current !== idx) setDropIdx(idx)
+  }
+
+  function handleDrop(e: React.DragEvent, idx: number) {
+    e.preventDefault()
+    const from = dragIdx.current
+    if (from === null || from === idx) { reset(); return }
+    const next = [...moveable]
+    const [moved] = next.splice(from, 1)
+    next.splice(idx, 0, moved)
+    onReorder([...next, ...pinned])
+    reset()
+  }
+
+  function reset() {
+    dragIdx.current = null
+    setDropIdx(null)
+  }
 
   return (
     <GlassCard className="card-appear">
@@ -139,38 +176,77 @@ function CategoryList({
           <Plus size={13} /> Add
         </button>
       </div>
+
       <div className="cat-items">
         {categories.length === 0 ? (
-          <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px 0', fontSize: 13 }}>
-            No categories yet
-          </p>
+          <div className="cat-list-empty">
+            <Tag size={22} style={{ opacity: 0.25 }} />
+            <span>No {type} categories yet</span>
+            <small>Click "Add" to create your first one</small>
+          </div>
         ) : (
-          categories.map(c => (
-            <div key={c.id} className="cat-item">
-              <CategoryIcon icon={c.icon} color={c.color} size={16} showBg bgSize={36} />
-              <span className="cat-item__name">{c.name}</span>
-              {c.budget && c.budget > 0 && (
-                <span className="cat-item__budget">Budget: {c.budget.toLocaleString('en-US')}</span>
-              )}
-              <div className="cat-item__actions">
-                <button className="icon-action" onClick={() => onEdit(c)} title="Edit">
-                  <Pencil size={13} />
-                </button>
-                <button className="icon-action icon-action--danger" onClick={() => onDelete(c.id)} title="Delete">
-                  <Trash2 size={13} />
-                </button>
+          <>
+            {moveable.map((c, idx) => (
+              <div
+                key={c.id}
+                className={[
+                  'cat-item',
+                  dropIdx === idx ? 'cat-item--drop-target' : '',
+                ].join(' ').trim()}
+                draggable
+                onDragStart={() => handleDragStart(idx)}
+                onDragOver={e => handleDragOver(e, idx)}
+                onDrop={e => handleDrop(e, idx)}
+                onDragEnd={reset}
+              >
+                <span className="cat-item__grip" title="Drag to reorder">
+                  <GripVertical size={14} />
+                </span>
+                <CategoryIcon icon={c.icon} color={c.color} size={16} showBg bgSize={36} />
+                <span className="cat-item__name">{c.name}</span>
+                {c.budget && c.budget > 0 && (
+                  <span className="cat-item__budget">Budget: {c.budget.toLocaleString('en-US')}</span>
+                )}
+                <div className="cat-item__actions">
+                  <button className="icon-action" onClick={() => onEdit(c)} title="Edit">
+                    <Pencil size={13} />
+                  </button>
+                  <button className="icon-action icon-action--danger" onClick={() => onDelete(c.id)} title="Delete">
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+
+            {pinned.map(c => (
+              <div key={c.id} className="cat-item cat-item--pinned">
+                <span className="cat-item__grip cat-item__grip--locked" title="Always last">
+                  <GripVertical size={14} />
+                </span>
+                <CategoryIcon icon={c.icon} color={c.color} size={16} showBg bgSize={36} />
+                <span className="cat-item__name">{c.name}</span>
+                {c.budget && c.budget > 0 && (
+                  <span className="cat-item__budget">Budget: {c.budget.toLocaleString('en-US')}</span>
+                )}
+                <div className="cat-item__actions">
+                  <button className="icon-action" onClick={() => onEdit(c)} title="Edit">
+                    <Pencil size={13} />
+                  </button>
+                  <button className="icon-action icon-action--danger" onClick={() => onDelete(c.id)} title="Delete">
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </>
         )}
       </div>
-
     </GlassCard>
   )
 }
 
 export default function Categories({ data }: Props) {
-  const { categories, addCategory, updateCategory, deleteCategory } = data
+  const { categories, settings, addCategory, updateCategory, deleteCategory, reorderCategories } = data
   const { toast } = useToast()
 
   const [modalType, setModalType] = useState<'income' | 'expense'>('expense')
@@ -178,11 +254,14 @@ export default function Categories({ data }: Props) {
   const [editCat, setEditCat] = useState<Category | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
-  const income = categories.filter(c => c.type === 'income')
+  const income  = categories.filter(c => c.type === 'income')
   const expense = categories.filter(c => c.type === 'expense')
+  const budgeted    = expense.filter(c => c.budget && c.budget > 0)
+  const totalBudget = budgeted.reduce((s, c) => s + (c.budget ?? 0), 0)
+  const fmt = (n: number) => formatCurrency(n, settings.currencySymbol, settings.currencyLocale)
 
-  const handleAdd = (t: 'income' | 'expense') => { setModalType(t); setEditCat(null); setShowModal(true) }
-  const handleEdit = (c: Category) => { setModalType(c.type); setEditCat(c); setShowModal(true) }
+  const handleAdd    = (t: 'income' | 'expense') => { setModalType(t); setEditCat(null); setShowModal(true) }
+  const handleEdit   = (c: Category) => { setModalType(c.type); setEditCat(c); setShowModal(true) }
   const handleDelete = (id: string) => setConfirmDelete(id)
 
   const handleSave = async (cat: Omit<Category, 'id'>) => {
@@ -214,6 +293,38 @@ export default function Categories({ data }: Props) {
         </div>
       </div>
 
+      {/* Overview strip */}
+      <GlassCard className="card-appear" style={{ marginBottom: 16 }}>
+        <div className="nw-strip">
+          <div className="nw-col">
+            <span className="nw-label">Total Categories</span>
+            <span className="nw-value">{categories.length}</span>
+          </div>
+          <div className="nw-divider" />
+          <div className="nw-col">
+            <span className="nw-label">Income</span>
+            <span className="nw-value" style={{ color: 'var(--income)' }}>{income.length}</span>
+          </div>
+          <div className="nw-divider" />
+          <div className="nw-col">
+            <span className="nw-label">Expense</span>
+            <span className="nw-value" style={{ color: 'var(--expense)' }}>{expense.length}</span>
+          </div>
+          <div className="nw-divider" />
+          <div className="nw-col">
+            <span className="nw-label">Budgeted Categories</span>
+            <span className="nw-value">{budgeted.length}</span>
+          </div>
+          <div className="nw-divider" />
+          <div className="nw-col">
+            <span className="nw-label">Total Monthly Budget</span>
+            <span className="nw-value" style={totalBudget === 0 ? { color: 'var(--text-muted)' } : undefined}>
+              {totalBudget === 0 ? '—' : fmt(totalBudget)}
+            </span>
+          </div>
+        </div>
+      </GlassCard>
+
       <div className="cat-grid">
         <CategoryList
           title="Income Categories"
@@ -222,6 +333,7 @@ export default function Categories({ data }: Props) {
           onAdd={() => handleAdd('income')}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          onReorder={reordered => reorderCategories('income', reordered)}
         />
         <CategoryList
           title="Expense Categories"
@@ -230,6 +342,7 @@ export default function Categories({ data }: Props) {
           onAdd={() => handleAdd('expense')}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          onReorder={reordered => reorderCategories('expense', reordered)}
         />
       </div>
 
@@ -256,7 +369,6 @@ export default function Categories({ data }: Props) {
           <button className="btn-danger" onClick={confirmDeleteCat}>Delete</button>
         </div>
       </Modal>
-
     </div>
   )
 }

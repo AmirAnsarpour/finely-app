@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Investment, InvestmentTransactionType } from '../types'
 import { fileManager } from '../utils/fileManager'
 import { generateId } from '../utils/formatters'
+import { getAssetDef } from '../utils/investmentAssets'
+import { fetchAssetPrice } from '../utils/investmentPricing'
 
 function signedQty(type: InvestmentTransactionType, quantity: number): number {
   return type === 'sell' ? -quantity : quantity
@@ -39,7 +41,20 @@ export function useInvestments() {
   const recordTransaction = useCallback(async (
     assetId: string, type: InvestmentTransactionType, quantity: number, date: string, note?: string
   ) => {
-    const tx = { id: generateId(), type, quantity, date, note: note || undefined, createdAt: new Date().toISOString() }
+    // Capture the Toman value of this transaction at the moment it's recorded,
+    // so historical investment totals can be tracked at original entry prices.
+    let valueTomanAtTime: number | undefined
+    const asset = getAssetDef(assetId)
+    if (asset) {
+      try {
+        const price = await fetchAssetPrice(asset, 'IRT')
+        if (price != null) valueTomanAtTime = price * quantity
+      } catch {
+        // best effort — leave undefined if a live price isn't available
+      }
+    }
+
+    const tx = { id: generateId(), type, quantity, date, note: note || undefined, valueTomanAtTime, createdAt: new Date().toISOString() }
     const existing = investments.find(i => i.assetId === assetId)
 
     let updated: Investment[]

@@ -7,6 +7,7 @@ import type { UseDataReturn } from '../hooks/useData'
 import { formatCurrency } from '../utils/formatters'
 import { useCalendar } from '../utils/calendarContext'
 import { useToast } from '../components/Toast'
+import { formatPriceValue } from '../utils/investmentPricing'
 
 interface Props { data: UseDataReturn }
 
@@ -32,11 +33,45 @@ function DeltaBadge({ cur, prev, goodIfPositive }: { cur: number; prev: number; 
   )
 }
 
+function MonthNav({
+  months, selected, onChange, currentMonth, formatLabel,
+}: {
+  months: string[]
+  selected: string
+  onChange: (m: string) => void
+  currentMonth: string
+  formatLabel: (m: string) => string
+}) {
+  const idx = months.indexOf(selected)
+  const canPrev = idx > 0
+  const canNext = idx < months.length - 1
+  const isCurrent = selected === currentMonth
+  return (
+    <div className="mnav card-appear">
+      <button className="mnav__arrow" onClick={() => canPrev && onChange(months[idx - 1])} disabled={!canPrev} aria-label="Previous month">
+        ‹
+      </button>
+      <div className="mnav__center">
+        <span className="mnav__label">{formatLabel(selected)}</span>
+        {isCurrent && <span className="mnav__current-badge">Current</span>}
+      </div>
+      <button className="mnav__arrow" onClick={() => canNext && onChange(months[idx + 1])} disabled={!canNext} aria-label="Next month">
+        ›
+      </button>
+      {!isCurrent && (
+        <button className="mnav__jump" onClick={() => onChange(months[months.length - 1])}>
+          ↩ Current month
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function Reports({ data }: Props) {
-  const { transactions, categories, settings, exportCSV } = data
+  const { transactions, categories, settings, investments, exportCSV } = data
   const { toast } = useToast()
   const {
-    calendarType, formatDateShort, getMonthLabel,
+    calendarType, formatDateShort, getMonthLabel, formatMonthYear,
     getMonthKey, currentMonthKey, getLast12Months, previousMonthKey,
     getDaysInMonth, dayISO,
   } = useCalendar()
@@ -163,6 +198,35 @@ export default function Reports({ data }: Props) {
       : [],
     [tagScopedTxs, selectedTag])
 
+  // ── Investment activity (Toman value at time of each transaction) ─
+  const investmentTxs = useMemo(() =>
+    investments.flatMap(inv => inv.transactions.map(tx => ({
+      date: tx.date,
+      // Buys add to invested capital, sells return capital — net them by sign.
+      value: tx.valueTomanAtTime == null ? null : (tx.type === 'sell' ? -tx.valueTomanAtTime : tx.valueTomanAtTime),
+    }))),
+    [investments])
+
+  const hasUntrackedInvestmentTx = useMemo(() =>
+    investmentTxs.some(tx => tx.value == null),
+    [investmentTxs])
+
+  const monthInvested = useMemo(() =>
+    investmentTxs
+      .filter(tx => tx.value != null && getMonthKey(tx.date) === selectedMonth)
+      .reduce((s, tx) => s + (tx.value as number), 0),
+    [investmentTxs, selectedMonth, getMonthKey])
+
+  const totalInvested = useMemo(() =>
+    investmentTxs
+      .filter(tx => tx.value != null)
+      .reduce((s, tx) => s + (tx.value as number), 0),
+    [investmentTxs])
+
+  const hasTrackedInvestmentTx = useMemo(() =>
+    investmentTxs.some(tx => tx.value != null),
+    [investmentTxs])
+
   // ── Yearly overview ──────────────────────────────────────
   const yearlyData = useMemo(() =>
     Array.from({ length: 12 }, (_, i) => {
@@ -172,16 +236,20 @@ export default function Reports({ data }: Props) {
       const expenses = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
       const net = income - expenses
       const savingsRate = income > 0 ? (net / income) * 100 : 0
-      return { monthNum: i + 1, key, income, expenses, net, savingsRate, empty: txs.length === 0 }
+      const invested = investmentTxs
+        .filter(tx => tx.value != null && getMonthKey(tx.date) === key)
+        .reduce((s, tx) => s + (tx.value as number), 0)
+      return { monthNum: i + 1, key, income, expenses, net, savingsRate, invested, empty: txs.length === 0 }
     }),
-    [transactions, selectedYear, getMonthKey])
+    [transactions, investmentTxs, selectedYear, getMonthKey])
 
   const yearlyTotals = useMemo(() => {
     const income = yearlyData.reduce((s, r) => s + r.income, 0)
     const expenses = yearlyData.reduce((s, r) => s + r.expenses, 0)
     const net = income - expenses
     const savingsRate = income > 0 ? (net / income) * 100 : 0
-    return { income, expenses, net, savingsRate }
+    const invested = yearlyData.reduce((s, r) => s + r.invested, 0)
+    return { income, expenses, net, savingsRate, invested }
   }, [yearlyData])
 
   const handleExportCSV = async () => {
@@ -196,21 +264,21 @@ export default function Reports({ data }: Props) {
       <div className="rp-header">
         <div>
           <h1 className="page-title">Reports</h1>
-          <p className="page-sub">Financial analytics — {getMonthLabel(selectedMonth)}</p>
+          <p className="page-sub">Financial analytics — {formatMonthYear(selectedMonth)}</p>
         </div>
         <button className="btn-export" onClick={handleExportCSV}>
           <Download size={15} /> Export CSV
         </button>
       </div>
 
-      {/* Month selector */}
-      <div className="month-tabs card-appear">
-        {months.map(m => (
-          <button key={m} className={`month-tab ${selectedMonth === m ? 'month-tab--active' : ''}`} onClick={() => setSelectedMonth(m)}>
-            {getMonthLabel(m)}
-          </button>
-        ))}
-      </div>
+      {/* Month navigator */}
+      <MonthNav
+        months={months}
+        selected={selectedMonth}
+        onChange={setSelectedMonth}
+        currentMonth={currentMonthKey()}
+        formatLabel={formatMonthYear}
+      />
 
       {/* ── KPI cards ──────────────────────────────────────── */}
       <div className="kpi-grid card-appear">
@@ -247,7 +315,7 @@ export default function Reports({ data }: Props) {
         {/* Top spending categories */}
         <GlassCard>
           <h2 className="section-title">Top Spending Categories</h2>
-          <p className="section-sub">{getMonthLabel(selectedMonth)}</p>
+          <p className="section-sub">{formatMonthYear(selectedMonth)}</p>
           {expenseBreakdown.length === 0 ? (
             <EmptyChart icon={TrendingDown} message="No expenses this month" hint="Add transactions to see your spending breakdown" />
           ) : (
@@ -275,7 +343,7 @@ export default function Reports({ data }: Props) {
         {/* Expense donut chart */}
         <GlassCard>
           <h2 className="section-title">Expense Breakdown</h2>
-          <p className="section-sub">{getMonthLabel(selectedMonth)}</p>
+          <p className="section-sub">{formatMonthYear(selectedMonth)}</p>
           {expenseBreakdown.length === 0 ? (
             <EmptyChart icon={PieChart} message="No expense data" hint="Your category breakdown will appear here" />
           ) : (
@@ -297,7 +365,7 @@ export default function Reports({ data }: Props) {
       {/* ── Daily spending chart ────────────────────────────── */}
       <GlassCard className="card-appear">
         <h2 className="section-title">Daily Activity</h2>
-        <p className="section-sub">Spending and income day by day — {getMonthLabel(selectedMonth)}</p>
+        <p className="section-sub">Spending and income day by day — {formatMonthYear(selectedMonth)}</p>
         <div style={{ marginTop: 16 }}>
           <DailySpendingChart data={dailyData} currencySymbol={settings.currencySymbol} currencyLocale={settings.currencyLocale} />
         </div>
@@ -308,7 +376,7 @@ export default function Reports({ data }: Props) {
         {/* Income sources */}
         <GlassCard>
           <h2 className="section-title">Income Sources</h2>
-          <p className="section-sub">{getMonthLabel(selectedMonth)}</p>
+          <p className="section-sub">{formatMonthYear(selectedMonth)}</p>
           {incomeBreakdown.length === 0 ? (
             <EmptyChart icon={TrendingUp} message="No income this month" hint="Income transactions will appear here" />
           ) : (
@@ -358,6 +426,38 @@ export default function Reports({ data }: Props) {
         </GlassCard>
       </div>
 
+      {/* ── Invested ────────────────────────────────────────── */}
+      {investments.length > 0 && (
+        <GlassCard className="card-appear">
+          <h2 className="section-title">Invested</h2>
+          <p className="section-sub">Value of your investment activity (T), at original entry prices</p>
+          <div className="nw-strip" style={{ marginTop: 14 }}>
+            <div className="nw-col">
+              <span className="nw-label">{formatMonthYear(selectedMonth)}</span>
+              <span className="nw-value" style={{ color: monthInvested >= 0 ? 'var(--income)' : 'var(--expense)' }}>
+                {monthInvested < 0 ? '−' : '+'}{formatPriceValue(Math.abs(monthInvested), 'IRT')}
+              </span>
+            </div>
+            <div className="nw-divider" />
+            <div className="nw-col">
+              <span className="nw-label">All time</span>
+              <span className="nw-value" style={{ color: totalInvested >= 0 ? 'var(--income)' : 'var(--expense)' }}>
+                {totalInvested < 0 ? '−' : '+'}{formatPriceValue(Math.abs(totalInvested), 'IRT')}
+              </span>
+            </div>
+          </div>
+          {!hasTrackedInvestmentTx ? (
+            <p style={{ marginTop: 14, marginBottom: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+              No price data captured yet — buys and sells are tracked from the moment they're recorded.
+            </p>
+          ) : hasUntrackedInvestmentTx ? (
+            <p style={{ marginTop: 14, marginBottom: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+              Some older entries don't have a captured price and aren't included in these totals.
+            </p>
+          ) : null}
+        </GlassCard>
+      )}
+
       {/* ── 12-month overview ───────────────────────────────── */}
       <GlassCard className="card-appear" style={{ gridColumn: '1 / -1' }}>
         <h2 className="section-title">12-Month Overview</h2>
@@ -371,7 +471,7 @@ export default function Reports({ data }: Props) {
       {budgetItems.length > 0 && (
         <GlassCard className="card-appear">
           <h2 className="section-title">Budget Tracker</h2>
-          <p className="section-sub">{getMonthLabel(selectedMonth)} — spending vs limits</p>
+          <p className="section-sub">{formatMonthYear(selectedMonth)} — spending vs limits</p>
           <div className="budget-grid">
             {budgetItems.map(({ cat, spent, pct, over }) => (
               <div key={cat.id} className="budget-item">
@@ -532,6 +632,7 @@ export default function Reports({ data }: Props) {
                 <th className="yr-th yr-th--num">Expenses</th>
                 <th className="yr-th yr-th--num">Net</th>
                 <th className="yr-th yr-th--num">Savings Rate</th>
+                {investments.length > 0 && <th className="yr-th yr-th--num">Invested</th>}
               </tr>
             </thead>
             <tbody>
@@ -544,6 +645,11 @@ export default function Reports({ data }: Props) {
                     {row.empty ? '—' : (row.net < 0 ? '−' : '+') + fmt(Math.abs(row.net))}
                   </td>
                   <td className="yr-td yr-td--num">{row.empty ? '—' : `${row.savingsRate.toFixed(1)}%`}</td>
+                  {investments.length > 0 && (
+                    <td className="yr-td yr-td--num" style={{ color: row.invested === 0 ? undefined : row.invested > 0 ? 'var(--income)' : 'var(--expense)' }}>
+                      {row.invested === 0 ? '—' : (row.invested < 0 ? '−' : '+') + formatPriceValue(Math.abs(row.invested), 'IRT')}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -556,6 +662,11 @@ export default function Reports({ data }: Props) {
                   {(yearlyTotals.net < 0 ? '−' : '+') + fmt(Math.abs(yearlyTotals.net))}
                 </td>
                 <td className="yr-td yr-td--num">{`${yearlyTotals.savingsRate.toFixed(1)}%`}</td>
+                {investments.length > 0 && (
+                  <td className="yr-td yr-td--num" style={{ color: yearlyTotals.invested === 0 ? undefined : yearlyTotals.invested > 0 ? 'var(--income)' : 'var(--expense)' }}>
+                    {yearlyTotals.invested === 0 ? '—' : (yearlyTotals.invested < 0 ? '−' : '+') + formatPriceValue(Math.abs(yearlyTotals.invested), 'IRT')}
+                  </td>
+                )}
               </tr>
             </tfoot>
           </table>

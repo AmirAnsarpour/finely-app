@@ -51,5 +51,14 @@ export function useCategories() {
     await fileManager.writeCategories(updated)
   }, [categories])
 
-  return { categories, loading, refreshing, error, loadData, addCategory, updateCategory, deleteCategory }
+  // Replaces all categories of `type` with `reordered` (same items, new sequence).
+  // Categories of the other type are left untouched.
+  const reorderCategories = useCallback(async (type: 'income' | 'expense', reordered: Category[]) => {
+    const rest = categories.filter(c => c.type !== type)
+    const updated = [...rest, ...reordered]
+    setCategories(updated)
+    await fileManager.writeCategories(updated)
+  }, [categories])
+
+  return { categories, loading, refreshing, error, loadData, addCategory, updateCategory, deleteCategory, reorderCategories }
 }

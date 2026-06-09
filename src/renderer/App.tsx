@@ -146,13 +146,9 @@ function AppShell() {
       }).length
   }, [data.categories, data.transactions, getMonthKey, currentMonthKey])
 
-  // Ctrl+N shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
-        e.preventDefault()
-        setShowAddModal(true)
-      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') e.preventDefault()
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)

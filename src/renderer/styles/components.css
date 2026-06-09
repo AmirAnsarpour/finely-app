@@ -215,8 +215,14 @@
 }
 
 .sidebar__nav {
-  display: flex; flex-direction: column; gap: 3px;
+  display: flex; flex-direction: column; gap: 14px;
   padding: 4px 12px 12px; flex: 1; overflow-y: auto;
+}
+.sidebar__group { display: flex; flex-direction: column; gap: 3px; }
+.sidebar__section-label {
+  font-size: 10px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.8px;
+  padding: 0 11px 4px;
 }
 .sidebar__link {
   display: flex; align-items: center; gap: 9px; padding: 9px 11px;
