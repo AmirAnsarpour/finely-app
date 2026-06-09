@@ -50,7 +50,8 @@ const FILE_MAP: Record<string, string> = {
   settings: 'settings.json',
   installments: 'installments.json',
   goals: 'goals.json',
-  investments: 'investments.json'
+  investments: 'investments.json',
+  accounts: 'accounts.json'
 }
 
 function ensureDataFolder(): void {
