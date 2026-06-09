@@ -9,12 +9,11 @@
 Track your income, expenses, investments, and accounts entirely offline.  
 Your data is plain JSON files on your own machine. Nothing leaves your device.
 
-[![Version](https://img.shields.io/badge/version-1.1.0-6c8ef5?style=flat-square)](https://github.com/AmirAnsarpour/finely-app/releases)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey?style=flat-square)](#download--install)
-[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.1.0-6c8ef5?style=flat-square)](https://github.com/AmirAnsarpour/finely-app)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey?style=flat-square)](#build-from-source)
 [![Built with Electron](https://img.shields.io/badge/built%20with-Electron-47848f?style=flat-square)](https://www.electronjs.org/)
 
-[**Download**](#download--install) · [**Build from Source**](#build-from-source) · [**Features**](#features)
+[**Build from Source**](#build-from-source) · [**Features**](#features)
 
 </div>
 
@@ -27,66 +26,6 @@ Finely is a desktop app that helps you take control of your money — without gi
 - No sign-up. No login. No internet required.
 - Data stored as plain JSON files you can read, copy, or back up yourself.
 - Point the data folder at Dropbox or Google Drive for optional cross-device sync.
-
----
-
-## Download & Install
-
-> **Just want to use the app?** Download a pre-built release — no coding required.
-
-### Windows
-
-Go to the [Releases page](https://github.com/AmirAnsarpour/finely-app/releases) and download one of:
-
-| File | What it is | Best for |
-|---|---|---|
-| `Finely-x.x.x-portable.exe` | Single `.exe`, no install needed | Most users — just double-click and run |
-| `Finely-x.x.x-setup.exe` | Traditional installer with Start Menu shortcut | If you prefer a proper installation |
-
-**Steps for the portable version (recommended):**
-1. Download `Finely-x.x.x-portable.exe`
-2. Double-click the file — Windows may show a SmartScreen warning since the app isn't code-signed
-3. Click **More info → Run anyway**
-4. Finely opens. No installation needed.
-
-> **SmartScreen warning?**  
-> This is normal for unsigned apps. Finely is open source — you can inspect every line of code in this repo.
-
----
-
-### Linux
-
-Go to the [Releases page](https://github.com/AmirAnsarpour/finely-app/releases) and download the format that fits your distro:
-
-| File | Format | How to install |
-|---|---|---|
-| `Finely-x.x.x.AppImage` | AppImage — universal, runs on any distro | No install needed (see below) |
-| `Finely-x.x.x-amd64.deb` | Debian/Ubuntu package | `sudo dpkg -i Finely-*.deb` |
-| `Finely-x.x.x.x86_64.rpm` | RPM — Fedora / openSUSE | `sudo rpm -i Finely-*.rpm` |
-
-**AppImage (works on any Linux distro):**
-
-```bash
-# 1. Make it executable
-chmod +x Finely-*.AppImage
-
-# 2. Run it
-./Finely-*.AppImage
-```
-
-**Debian / Ubuntu:**
-
-```bash
-sudo dpkg -i Finely-*-amd64.deb
-# Then launch from your app menu or run: finely
-```
-
-**Fedora / RHEL / openSUSE:**
-
-```bash
-sudo rpm -i Finely-*.x86_64.rpm
-# Then launch from your app menu or run: finely
-```
 
 ---
 
@@ -302,15 +241,6 @@ Click **More info**, then **Run anyway**. This happens because the app isn't cod
 
 **Can I run it on macOS?**  
 macOS is not officially supported yet (no macOS build target is configured), but you can run it in development mode with `bun run dev` on a Mac.
-
-**Where are the release builds?**  
-On the [GitHub Releases page](https://github.com/AmirAnsarpour/finely-app/releases).
-
----
-
-## License
-
-MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
