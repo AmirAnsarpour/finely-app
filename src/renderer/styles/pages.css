@@ -69,9 +69,17 @@
 .budget-top { display: flex; justify-content: space-between; margin-bottom: 5px; }
 .budget-name { font-size: 12px; font-weight: 500; color: var(--text-primary); }
 .budget-amt { font-size: 11px; font-variant-numeric: tabular-nums; }
-.budget-track { height: 5px; background: var(--glass-bg); border-radius: 3px; overflow: hidden; }
+.budget-track { height: 5px; background: var(--glass-bg); border-radius: 3px; overflow: hidden; margin-bottom: 4px; }
 .budget-fill { height: 100%; border-radius: 3px; transition: width 0.6s var(--ease-out); }
+.budget-rollover { font-size: 10px; color: var(--accent); font-weight: 500; margin-bottom: 3px; }
+.budget-forecast { font-size: 10px; margin-top: 2px; }
 .recent-card { flex: 1; }
+
+/* Spending insights strip */
+.insights-header { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.insights-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.insights-list { display: flex; flex-direction: column; gap: 6px; }
+.insight-row { font-size: 12px; color: var(--text-secondary); line-height: 1.5; padding: 7px 10px; background: var(--glass-bg); border-radius: var(--radius-sm); border-left: 2px solid var(--accent); }
 
 /* ── Transactions ──────────────────────────────────────────── */
 .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
@@ -140,6 +148,15 @@
 .cat-preview { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); }
 .form-error { font-size: 12px; color: var(--expense); background: var(--expense-dim); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid rgba(248,113,113,0.25); }
 .form-actions { display: flex; gap: 10px; justify-content: flex-end; padding-top: 4px; }
+
+/* Rollover toggle */
+.rollover-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; padding: 10px 14px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); transition: border-color var(--transition); }
+.rollover-toggle:hover { border-color: var(--glass-border-hover); }
+.rollover-toggle__text { display: flex; flex-direction: column; gap: 2px; }
+.rollover-toggle__switch { width: 34px; height: 19px; border-radius: 10px; background: var(--glass-bg-hover); border: 1px solid var(--glass-border); position: relative; flex-shrink: 0; transition: background var(--transition), border-color var(--transition); }
+.rollover-toggle__switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--text-muted); transition: transform var(--transition), background var(--transition); }
+.rollover-toggle__switch--on { background: var(--accent-dim); border-color: var(--accent); }
+.rollover-toggle__switch--on::after { transform: translateX(15px); background: var(--accent); }
 .btn-primary { padding: 10px 20px; border-radius: var(--radius-md); background: var(--accent); color: white; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: background var(--transition), opacity var(--transition); }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -688,6 +705,7 @@
 .inv-card__history svg:last-child { margin-left: auto; }
 .inv-card__add { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 7px 12px; border-radius: var(--radius-sm); background: transparent; border: 1px solid; font-size: 12px; font-weight: 600; cursor: pointer; transition: opacity var(--transition); }
 .inv-card__add:hover { opacity: 0.75; }
+.inv-card__pnl-pct { font-size: 11px; font-weight: 500; opacity: 0.8; }
 
 /* Compact buy/sell transaction form */
 .itx-row { display: flex; gap: 12px; }
@@ -752,3 +770,31 @@
 .update-progress-track { height: 4px; background: var(--glass-bg-hover); border-radius: 2px; overflow: hidden; margin-top: 8px; }
 .update-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s ease; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+
+/* ── Accounts ─────────────────────────────────────────────── */
+.acc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+
+.acc-card { display: flex; overflow: hidden; padding: 0; }
+.acc-card__accent { width: 4px; flex-shrink: 0; }
+.acc-card__body { flex: 1; padding: 20px 22px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+.acc-card__top { display: flex; align-items: center; gap: 12px; }
+.acc-card__meta { flex: 1; min-width: 0; }
+.acc-card__name { font-size: 15px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acc-card__sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.acc-card__actions { display: flex; gap: 4px; opacity: 0; transition: opacity var(--transition); }
+.acc-card:hover .acc-card__actions { opacity: 1; }
+
+.acc-card__balance { display: flex; flex-direction: column; gap: 3px; padding: 14px 16px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); }
+.acc-card__balance-label { font-size: 10px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.acc-card__balance-value { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
+
+.acc-card__stats { display: flex; align-items: stretch; gap: 0; }
+.acc-card__stat { flex: 1; display: flex; align-items: center; gap: 10px; }
+.acc-card__stat-divider { width: 1px; background: var(--glass-border); margin: 0 14px; flex-shrink: 0; }
+.acc-card__stat-icon { width: 28px; height: 28px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.acc-card__stat-label { font-size: 10px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.acc-card__stat-value { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+
+.acc-unassigned-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 16px; padding: 10px 14px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); font-size: 12px; color: var(--text-muted); line-height: 1.5; }

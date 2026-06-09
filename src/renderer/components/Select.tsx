@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, X } from 'lucide-react'
 
 export interface SelectOption {
   value: string
@@ -13,9 +13,10 @@ interface Props {
   onChange: (v: string) => void
   options: SelectOption[]
   placeholder?: string
+  clearable?: boolean
 }
 
-export default function Select({ value, onChange, options, placeholder = 'Select…' }: Props) {
+export default function Select({ value, onChange, options, placeholder = 'Select…', clearable = false }: Props) {
   const [open, setOpen] = useState(false)
   const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({})
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -73,7 +74,13 @@ export default function Select({ value, onChange, options, placeholder = 'Select
           {selected?.color && <span className="cs-dot" style={{ background: selected.color }} />}
           <span className={selected ? 'cs-val' : 'cs-ph'}>{selected?.label ?? placeholder}</span>
         </span>
-        <ChevronDown size={13} className={`cs-arrow ${open ? 'cs-arrow--open' : ''}`} />
+        {clearable && selected ? (
+          <span className="cs-clear" onMouseDown={e => { e.stopPropagation(); onChange('') }}>
+            <X size={11} />
+          </span>
+        ) : (
+          <ChevronDown size={13} className={`cs-arrow ${open ? 'cs-arrow--open' : ''}`} />
+        )}
       </button>
 
       {open && createPortal(

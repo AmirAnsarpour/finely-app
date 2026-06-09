@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Pencil, Trash2 } from 'lucide-react'
-import type { Transaction, Category, AppSettings } from '../types'
+import type { Account, Transaction, Category, AppSettings } from '../types'
 import CategoryIcon from './CategoryIcon'
 import { formatCurrency } from '../utils/formatters'
 import { useCalendar } from '../utils/calendarContext'
@@ -9,6 +9,7 @@ import { useCalendar } from '../utils/calendarContext'
 interface TransactionItemProps {
   transaction: Transaction
   categories: Category[]
+  accounts?: Account[]
   settings: AppSettings
   onEdit?: (t: Transaction) => void
   onDelete?: (id: string) => void
@@ -18,6 +19,7 @@ interface TransactionItemProps {
 export default function TransactionItem({
   transaction,
   categories,
+  accounts = [],
   settings,
   onEdit,
   onDelete,
@@ -25,6 +27,7 @@ export default function TransactionItem({
 }: TransactionItemProps) {
   const { formatDateShort } = useCalendar()
   const category = categories.find(c => c.id === transaction.category)
+  const account  = transaction.accountId ? accounts.find(a => a.id === transaction.accountId) : undefined
   const isIncome = transaction.type === 'income'
   const [tip, setTip] = useState<{ x: number; y: number } | null>(null)
 
@@ -45,7 +48,14 @@ export default function TransactionItem({
       />
 
       <div className="tx-row__info">
-        <span className="tx-row__name">{category?.name ?? 'Unknown'}</span>
+        <div className="tx-row__name-row">
+          <span className="tx-row__name">{category?.name ?? 'Unknown'}</span>
+          {account && (
+            <span className="tx-row__account" style={{ borderColor: `${account.color}55`, color: account.color }}>
+              {account.name}
+            </span>
+          )}
+        </div>
         {transaction.note && (
           <span className="tx-row__note">
             {transaction.note}

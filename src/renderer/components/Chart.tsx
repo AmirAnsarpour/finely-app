@@ -7,6 +7,7 @@ import {
 import type { MonthlyData, CategoryBreakdown } from '../types'
 import { formatCurrency } from '../utils/formatters'
 
+
 interface MonthlyChartProps {
   data: MonthlyData[]
   currencySymbol: string

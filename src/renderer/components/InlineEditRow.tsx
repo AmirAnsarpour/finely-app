@@ -2,30 +2,34 @@ import React, { useState, useRef } from 'react'
 import { Check, X, Tag } from 'lucide-react'
 import Select from './Select'
 import DatePicker from './DatePicker'
-import type { Transaction, Category, AppSettings } from '../types'
+import type { Account, Transaction, Category, AppSettings } from '../types'
 import { todayString } from '../utils/formatters'
 
 interface Props {
   transaction: Transaction
   categories: Category[]
+  accounts: Account[]
   settings: AppSettings
   onSave: (id: string, changes: Partial<Transaction>) => void
   onCancel: () => void
 }
 
-export default function InlineEditRow({ transaction, categories, settings, onSave, onCancel }: Props) {
-  const [type, setType]         = useState<'income' | 'expense'>(transaction.type)
-  const [category, setCategory] = useState(transaction.category)
-  const [amount, setAmount]     = useState(String(transaction.amount))
-  const [date, setDate]         = useState(transaction.date)
-  const [note, setNote]         = useState(transaction.note)
-  const [tags, setTags]         = useState<string[]>(transaction.tags ?? [])
-  const [tagInput, setTagInput] = useState('')
-  const [amKey, setAmKey]       = useState(0)
-  const [focused, setFocused]   = useState(false)
-  const [shake, setShake]       = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+export default function InlineEditRow({ transaction, categories, accounts, settings, onSave, onCancel }: Props) {
+  const [type, setType]           = useState<'income' | 'expense'>(transaction.type)
+  const [category, setCategory]   = useState(transaction.category)
+  const [accountId, setAccountId] = useState(transaction.accountId ?? '')
+  const [amount, setAmount]       = useState(String(transaction.amount))
+  const [date, setDate]           = useState(transaction.date)
+  const [note, setNote]           = useState(transaction.note)
+  const [tags, setTags]           = useState<string[]>(transaction.tags ?? [])
+  const [tagInput, setTagInput]   = useState('')
+  const [amKey, setAmKey]         = useState(0)
+  const [focused, setFocused]     = useState(false)
+  const [shake, setShake]         = useState(false)
+  const inputRef    = useRef<HTMLInputElement>(null)
   const tagInputRef = useRef<HTMLInputElement>(null)
+
+  const accountOptions = accounts.map(a => ({ value: a.id, label: a.name, color: a.color }))
 
   const addTag = () => {
     const t = tagInput.trim().replace(/,/g, '')
@@ -62,7 +66,7 @@ export default function InlineEditRow({ transaction, categories, settings, onSav
       setTimeout(() => setShake(false), 500)
       return
     }
-    onSave(transaction.id, { type, category, amount: parsed, date, note, tags: tags.length > 0 ? tags : undefined })
+    onSave(transaction.id, { type, category, amount: parsed, date, note, tags: tags.length > 0 ? tags : undefined, accountId: accountId || undefined })
   }
 
   const handleKey = (e: React.KeyboardEvent) => {
@@ -147,6 +151,12 @@ export default function InlineEditRow({ transaction, categories, settings, onSav
               maxLength={200}
             />
           </div>
+          {accounts.length > 0 && (
+            <div className="ile-field-group">
+              <span className="ile-label">Account</span>
+              <Select value={accountId} onChange={setAccountId} options={accountOptions} placeholder="No account…" clearable />
+            </div>
+          )}
           <div className="ile-field-group">
             <div className="ile-tag-label-row">
               <span className="ile-label">Tags</span>

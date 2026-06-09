@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Lightbulb, Tag, X } from 'lucide-react'
-import type { Transaction, Category, AppSettings } from '../types'
-import { todayString } from '../utils/formatters'
+import type { Account, Transaction, Category, AppSettings } from '../types'
+import { todayString, formatCurrency } from '../utils/formatters'
 import { normalizeDigits } from '../utils/numerals'
 import Select from '../components/Select'
 import DatePicker from '../components/DatePicker'
 
 interface Props {
   categories: Category[]
+  accounts: Account[]
   settings: AppSettings
   transactions: Transaction[]
   initial?: Transaction
@@ -16,28 +17,31 @@ interface Props {
   onDirtyChange?: (dirty: boolean) => void
 }
 
-export default function TransactionForm({ categories, settings, transactions, initial, onSave, onCancel, onDirtyChange }: Props) {
-  const [type, setType] = useState<'income' | 'expense'>(initial?.type ?? 'expense')
-  const [amount, setAmount] = useState(initial?.amount?.toString() ?? '')
-  const [category, setCategory] = useState(initial?.category ?? '')
-  const [date, setDate] = useState(initial?.date ?? todayString())
-  const [note, setNote] = useState(initial?.note ?? '')
-  const [tags, setTags] = useState<string[]>(initial?.tags ?? [])
-  const [tagInput, setTagInput] = useState('')
+export default function TransactionForm({ categories, accounts, settings, transactions, initial, onSave, onCancel, onDirtyChange }: Props) {
+  const [type, setType]           = useState<'income' | 'expense'>(initial?.type ?? 'expense')
+  const [amount, setAmount]       = useState(initial?.amount?.toString() ?? '')
+  const [category, setCategory]   = useState(initial?.category ?? '')
+  const [accountId, setAccountId] = useState(initial?.accountId ?? '')
+  const [date, setDate]           = useState(initial?.date ?? todayString())
+  const [note, setNote]           = useState(initial?.note ?? '')
+  const [tags, setTags]           = useState<string[]>(initial?.tags ?? [])
+  const [tagInput, setTagInput]   = useState('')
   const [suggestion, setSuggestion] = useState<{ categoryId: string; categoryName: string } | null>(null)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError]   = useState('')
   const [animKey, setAnimKey] = useState(0)
   const [focused, setFocused] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef    = useRef<HTMLInputElement>(null)
   const tagInputRef = useRef<HTMLInputElement>(null)
+
+  const accountOptions = accounts.map(a => ({ value: a.id, label: a.name, color: a.color }))
 
   const filtered = categories.filter(c => c.type === type)
   const categoryOptions = filtered.map(c => ({ value: c.id, label: c.name, color: c.color }))
 
   const isDirty = !initial
-    ? (amount !== '' || category !== '' || note !== '' || tags.length > 0)
-    : (amount !== initial.amount.toString() || category !== initial.category || date !== initial.date || note !== initial.note || type !== initial.type || JSON.stringify(tags) !== JSON.stringify(initial.tags ?? []))
+    ? (amount !== '' || category !== '' || accountId !== '' || note !== '' || tags.length > 0)
+    : (amount !== initial.amount.toString() || category !== initial.category || accountId !== (initial.accountId ?? '') || date !== initial.date || note !== initial.note || type !== initial.type || JSON.stringify(tags) !== JSON.stringify(initial.tags ?? []))
 
   useEffect(() => {
     onDirtyChange?.(isDirty)
@@ -90,10 +94,24 @@ export default function TransactionForm({ categories, settings, transactions, in
     const amt = parseFloat(amount)
     if (!amount || isNaN(amt) || amt <= 0) { setError('Enter a valid amount'); return }
     if (!category) { setError('Select a category'); return }
+
+    // Balance validation: block expense if account balance is insufficient
+    if (type === 'expense' && accountId) {
+      const balance = transactions
+        .filter(t => t.accountId === accountId && t.id !== initial?.id)
+        .reduce((s, t) => t.type === 'income' ? s + t.amount : s - t.amount, 0)
+      if (amt > balance) {
+        const account = accounts.find(a => a.id === accountId)
+        const fmt = (n: number) => formatCurrency(n, settings.currencySymbol, settings.currencyLocale)
+        setError(`Insufficient balance in ${account?.name ?? 'this account'} — available: ${fmt(Math.max(0, balance))}`)
+        return
+      }
+    }
+
     setError('')
     setSaving(true)
     try {
-      await onSave({ type, amount: amt, category, date, note, tags: tags.length > 0 ? tags : undefined })
+      await onSave({ type, amount: amt, category, date, note, tags: tags.length > 0 ? tags : undefined, accountId: accountId || undefined })
       onDirtyChange?.(false)
     } finally {
       setSaving(false)
@@ -172,6 +190,19 @@ export default function TransactionForm({ categories, settings, transactions, in
           <DatePicker value={date} onChange={setDate} max={todayString()} />
         </div>
       </div>
+
+      {accounts.length > 0 && (
+        <div className="form-group">
+          <label className="form-label">Account <span className="form-label--opt">(optional)</span></label>
+          <Select
+            value={accountId}
+            onChange={setAccountId}
+            options={accountOptions}
+            placeholder="No account selected…"
+            clearable
+          />
+        </div>
+      )}
 
       <div className="form-group">
         <label className="form-label">Note <span className="form-label--opt">(optional)</span></label>

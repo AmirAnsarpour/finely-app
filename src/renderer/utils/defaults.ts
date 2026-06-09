@@ -1,4 +1,4 @@
-import type { Category, AppSettings } from '../types'
+import type { Account, Category, AppSettings } from '../types'
 import { generateId } from './formatters'
 
 export const DEFAULT_CATEGORIES: Category[] = [
@@ -18,6 +18,12 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: generateId(), name: 'Education', type: 'expense', color: '#818cf8', icon: 'book-open' },
   { id: generateId(), name: 'Bills & Utilities', type: 'expense', color: '#fbbf24', icon: 'zap' },
   { id: generateId(), name: 'Other Expense', type: 'expense', color: '#94a3b8', icon: 'more-horizontal' },
+]
+
+export const DEFAULT_ACCOUNTS: Account[] = [
+  { id: generateId(), name: 'Cash',    color: '#4ade80', icon: 'wallet',     createdAt: new Date().toISOString() },
+  { id: generateId(), name: 'Card',    color: '#60a5fa', icon: 'banknote',   createdAt: new Date().toISOString() },
+  { id: generateId(), name: 'Savings', color: '#fbbf24', icon: 'piggy-bank', createdAt: new Date().toISOString() },
 ]
 
 export const DEFAULT_SETTINGS: AppSettings = {

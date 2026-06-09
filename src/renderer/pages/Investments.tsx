@@ -193,6 +193,9 @@ function InvestmentCard({
   asset,
   unitPriceLabel,
   valueLabel,
+  costBasisLabel,
+  pnl,
+  pnlPct,
   onTransact,
   onViewHistory,
 }: {
@@ -200,6 +203,9 @@ function InvestmentCard({
   asset: InvestmentAssetDef
   unitPriceLabel: string | null
   valueLabel: string | null
+  costBasisLabel: string | null
+  pnl: number | null
+  pnlPct: number | null
   onTransact: () => void
   onViewHistory: () => void
 }) {
@@ -229,6 +235,21 @@ function InvestmentCard({
             <span className="inv-card__stat-label">Total value</span>
             <span className="inv-card__stat-value inv-card__stat-value--total">{valueLabel ?? '—'}</span>
           </div>
+          {costBasisLabel != null && (
+            <div className="inv-card__stat">
+              <span className="inv-card__stat-label">Cost basis</span>
+              <span className="inv-card__stat-value">{costBasisLabel}</span>
+            </div>
+          )}
+          {pnl != null && pnlPct != null && (
+            <div className="inv-card__stat">
+              <span className="inv-card__stat-label">P&amp;L</span>
+              <span className="inv-card__stat-value" style={{ color: pnl >= 0 ? 'var(--income)' : 'var(--expense)' }}>
+                {pnl >= 0 ? '+' : '−'}{formatPriceValue(Math.abs(pnl), 'IRT')}
+                <span className="inv-card__pnl-pct"> ({pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%)</span>
+              </span>
+            </div>
+          )}
         </div>
 
         <button className="inv-card__history" onClick={onViewHistory}>
@@ -244,6 +265,17 @@ function InvestmentCard({
       </div>
     </GlassCard>
   )
+}
+
+function computeCostBasis(investment: Investment): number | null {
+  let total = 0
+  let hasData = false
+  for (const tx of investment.transactions) {
+    if (tx.valueTomanAtTime == null) continue
+    hasData = true
+    total += tx.type === 'buy' ? tx.valueTomanAtTime : -tx.valueTomanAtTime
+  }
+  return hasData ? Math.max(0, total) : null
 }
 
 // ── Main page ─────────────────────────────────────────────────
@@ -356,10 +388,17 @@ export default function Investments({ data }: { data: UseDataReturn }) {
           <div className="inv-grid">
             {sorted.map(({ inv, asset }) => {
               const unitPrice = prices[asset.id]
+              const currentValueIRT = displayCurrency === 'IRT' && unitPrice != null ? inv.quantity * unitPrice : null
+              const costBasis = displayCurrency === 'IRT' ? computeCostBasis(inv) : null
+              const pnl = costBasis != null && currentValueIRT != null ? currentValueIRT - costBasis : null
+              const pnlPct = costBasis != null && pnl != null && costBasis > 0 ? (pnl / costBasis) * 100 : null
               return (
                 <InvestmentCard key={inv.id} investment={inv} asset={asset}
                   unitPriceLabel={unitPrice != null ? formatPriceValue(unitPrice, displayCurrency) : null}
                   valueLabel={unitPrice != null ? formatPriceValue(inv.quantity * unitPrice, displayCurrency) : null}
+                  costBasisLabel={costBasis != null ? formatPriceValue(costBasis, 'IRT') : null}
+                  pnl={pnl}
+                  pnlPct={pnlPct}
                   onTransact={() => setTransactFor(inv)}
                   onViewHistory={() => setHistoryFor(inv)}
                 />

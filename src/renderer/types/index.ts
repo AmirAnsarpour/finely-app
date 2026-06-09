@@ -1,3 +1,11 @@
+export interface Account {
+  id: string
+  name: string
+  color: string
+  icon: string
+  createdAt: string
+}
+
 export interface Transaction {
   id: string
   amount: number
@@ -6,6 +14,7 @@ export interface Transaction {
   date: string
   note: string
   tags?: string[]
+  accountId?: string
   createdAt: string
 }
 
@@ -16,6 +25,7 @@ export interface Category {
   color: string
   icon: string
   budget?: number
+  rollover?: boolean
 }
 
 export interface AppSettings {

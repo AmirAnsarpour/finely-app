@@ -2,7 +2,7 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, ArrowLeftRight, Tag,
-  BarChart3, Settings, Minus, Square, X, Plus, CreditCard, Target, TrendingUp
+  BarChart3, Settings, Minus, Square, X, Plus, CreditCard, Target, TrendingUp, Wallet
 } from 'lucide-react'
 import logoUrl from '../assets/finely.png'
 
@@ -20,6 +20,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/transactions', icon: ArrowLeftRight, label: 'Transactions' },
       { to: '/categories', icon: Tag, label: 'Categories' },
+      { to: '/accounts', icon: Wallet, label: 'Accounts' },
     ],
   },
   {

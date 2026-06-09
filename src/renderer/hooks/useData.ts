@@ -6,6 +6,7 @@ import { useSettings }     from './useSettings'
 import { useInstallments } from './useInstallments'
 import { useGoals }        from './useGoals'
 import { useInvestments }  from './useInvestments'
+import { useAccounts }     from './useAccounts'
 
 export function useData() {
   const tx   = useTransactions()
@@ -14,16 +15,17 @@ export function useData() {
   const inst = useInstallments()
   const goal = useGoals()
   const inv  = useInvestments()
+  const acc  = useAccounts()
 
-  const loading    = tx.loading    || cat.loading    || sett.loading    || inst.loading    || goal.loading    || inv.loading
-  const refreshing = tx.refreshing || cat.refreshing || sett.refreshing || inst.refreshing || goal.refreshing || inv.refreshing
-  const error      = tx.error      || cat.error      || sett.error      || inst.error      || goal.error      || inv.error
+  const loading    = tx.loading    || cat.loading    || sett.loading    || inst.loading    || goal.loading    || inv.loading    || acc.loading
+  const refreshing = tx.refreshing || cat.refreshing || sett.refreshing || inst.refreshing || goal.refreshing || inv.refreshing || acc.refreshing
+  const error      = tx.error      || cat.error      || sett.error      || inst.error      || goal.error      || inv.error      || acc.error
 
   const refreshData = useCallback(async () => {
     await Promise.all([
-      tx.loadData(), cat.loadData(), sett.loadData(), inst.loadData(), goal.loadData(), inv.loadData(),
+      tx.loadData(), cat.loadData(), sett.loadData(), inst.loadData(), goal.loadData(), inv.loadData(), acc.loadData(),
     ])
-  }, [tx.loadData, cat.loadData, sett.loadData, inst.loadData, goal.loadData, inv.loadData])
+  }, [tx.loadData, cat.loadData, sett.loadData, inst.loadData, goal.loadData, inv.loadData, acc.loadData])
 
   const exportCSV = useCallback(async () =>
     fileManager.exportCSV(tx.transactions, cat.categories, sett.settings.currencySymbol),
@@ -46,6 +48,7 @@ export function useData() {
     installments:  inst.installments,
     goals:         goal.goals,
     investments:   inv.investments,
+    accounts:      acc.accounts,
     loading,
     refreshing,
     error,
@@ -68,6 +71,9 @@ export function useData() {
     logGoalContribution: goal.logGoalContribution,
     recordInvestmentTransaction: inv.recordTransaction,
     deleteInvestmentTransaction: inv.deleteTransaction,
+    addAccount:    acc.addAccount,
+    updateAccount: acc.updateAccount,
+    deleteAccount: acc.deleteAccount,
     refreshData,
     exportCSV,
     exportZip,

@@ -33,17 +33,20 @@ function CategoryForm({
   const [color, setColor] = useState(initial?.color ?? DEFAULT_COLOR_PRESETS[0])
   const [icon, setIcon] = useState(initial?.icon ?? AVAILABLE_ICONS[0])
   const [budget, setBudget] = useState(initial?.budget?.toString() ?? '')
+  const [rollover, setRollover] = useState(initial?.rollover ?? false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  const budgetNum = budget ? parseFloat(budget) : undefined
+  const hasBudget = !!budgetNum && budgetNum > 0
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) { setError('Name is required'); return }
-    const budgetNum = budget ? parseFloat(budget) : undefined
     if (budget && (isNaN(budgetNum!) || budgetNum! <= 0)) { setError('Budget must be a positive number'); return }
     setSaving(true)
     try {
-      await onSave({ name: name.trim(), type, color, icon, budget: budgetNum })
+      await onSave({ name: name.trim(), type, color, icon, budget: budgetNum, rollover: hasBudget ? rollover : undefined })
     } finally {
       setSaving(false)
     }
@@ -76,17 +79,36 @@ function CategoryForm({
         </div>
       </div>
       {type === 'expense' && (
-        <div className="form-group">
-          <label className="form-label">Monthly Budget <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
-          <input
-            className="form-input"
-            type="text"
-            inputMode="decimal"
-            placeholder="e.g. 500"
-            value={budget}
-            onChange={e => setBudget(normalizeDigits(e.target.value))}
-          />
-        </div>
+        <>
+          <div className="form-group">
+            <label className="form-label">Monthly Budget <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
+            <input
+              className="form-input"
+              type="text"
+              inputMode="decimal"
+              placeholder="e.g. 500"
+              value={budget}
+              onChange={e => setBudget(normalizeDigits(e.target.value))}
+            />
+          </div>
+          {hasBudget && (
+            <div className="form-group">
+              <label className="rollover-toggle">
+                <span className="rollover-toggle__text">
+                  <span className="form-label" style={{ margin: 0 }}>Roll over unspent budget</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>Carry surplus from last month into this month</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={rollover}
+                  onChange={e => setRollover(e.target.checked)}
+                  style={{ display: 'none' }}
+                />
+                <span className={`rollover-toggle__switch ${rollover ? 'rollover-toggle__switch--on' : ''}`} />
+              </label>
+            </div>
+          )}
+        </>
       )}
       <div className="cat-preview">
         <CategoryIcon icon={icon} color={color} size={18} showBg bgSize={40} />

@@ -9,6 +9,7 @@ import Settings from './pages/Settings'
 import Installments from './pages/Installments'
 import Goals from './pages/Goals'
 import Investments from './pages/Investments'
+import Accounts from './pages/Accounts'
 import Modal from './components/Modal'
 import TransactionForm from './pages/TransactionForm'
 import { useData } from './hooks/useData'
@@ -230,6 +231,7 @@ function AppShell() {
           <Route path="/installments" element={<Installments data={data} />} />
           <Route path="/goals" element={<Goals data={data} />} />
           <Route path="/investments" element={<Investments data={data} />} />
+          <Route path="/accounts" element={<Accounts data={data} />} />
         </Routes>
       </main>
 
@@ -240,6 +242,7 @@ function AppShell() {
         ) : (
           <TransactionForm
             categories={data.categories}
+            accounts={data.accounts}
             settings={data.settings}
             transactions={data.transactions}
             onDirtyChange={setFormDirty}

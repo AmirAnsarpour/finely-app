@@ -1,12 +1,12 @@
 import React, { useMemo } from 'react'
-import { TrendingUp, TrendingDown, Wallet, PiggyBank, ArrowUpRight, ArrowDownRight, Sparkles } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, PiggyBank, ArrowUpRight, ArrowDownRight, Sparkles, Lightbulb } from 'lucide-react'
 import GlassCard from '../components/GlassCard'
 import TransactionItem from '../components/TransactionItem'
 import CategoryIcon from '../components/CategoryIcon'
 import SkeletonRow from '../components/SkeletonRow'
 import { MonthlyBarChart } from '../components/Chart'
 import type { UseDataReturn } from '../hooks/useData'
-import { formatCurrency } from '../utils/formatters'
+import { formatCurrency, todayString } from '../utils/formatters'
 import { useCalendar } from '../utils/calendarContext'
 import { useCountUp } from '../components/AnimatedNumber'
 import { useInvestmentPrices } from '../hooks/useInvestmentPrices'
@@ -15,10 +15,11 @@ import { formatPriceValue } from '../utils/investmentPricing'
 interface Props { data: UseDataReturn }
 
 export default function Dashboard({ data }: Props) {
-  const { transactions, categories, settings, goals, installments, investments, refreshing } = data
+  const { transactions, categories, accounts, settings, goals, installments, investments, refreshing } = data
   const {
     getMonthKey, currentMonthKey, previousMonthKey,
     getLast6Months, getMonthLabel, formatMonthYear,
+    getDaysInMonth, dayISO,
   } = useCalendar()
 
   const currentMonth = currentMonthKey()
@@ -53,19 +54,100 @@ export default function Dashboard({ data }: Props) {
 
   // Budget progress (expense categories with a budget set)
   const budgetItems = useMemo(() => {
+    const todayISO = todayString()
+    const totalDays = getDaysInMonth(currentMonth)
+
+    // Find which day of the month today falls on (works for both Gregorian and Jalali)
+    let dayOfMonth = 1
+    for (let d = totalDays; d >= 1; d--) {
+      if (dayISO(currentMonth, d) <= todayISO) { dayOfMonth = d; break }
+    }
+
     return categories
       .filter(c => c.type === 'expense' && c.budget && c.budget > 0)
       .map(c => {
         const spent = transactions
           .filter(t => t.type === 'expense' && t.category === c.id && getMonthKey(t.date) === currentMonth)
           .reduce((s, t) => s + t.amount, 0)
-        const pct = Math.min((spent / c.budget!) * 100, 100)
-        const over = spent > c.budget!
-        return { ...c, spent, pct, over, warning: !over && pct >= 80 }
+
+        // #5 Budget rollover
+        let rolloverAmt = 0
+        if (c.rollover) {
+          const lastMonthSpent = transactions
+            .filter(t => t.type === 'expense' && t.category === c.id && getMonthKey(t.date) === lastMonth)
+            .reduce((s, t) => s + t.amount, 0)
+          rolloverAmt = Math.max(0, c.budget! - lastMonthSpent)
+        }
+        const effectiveBudget = c.budget! + rolloverAmt
+
+        const pct = Math.min((spent / effectiveBudget) * 100, 100)
+        const over = spent > effectiveBudget
+
+        // #11 Budget forecast
+        let forecast: string | null = null
+        if (dayOfMonth >= 3 && spent > 0 && !over) {
+          const dailyRate = spent / dayOfMonth
+          const daysLeft = (effectiveBudget - spent) / dailyRate
+          const exceedDay = Math.round(dayOfMonth + daysLeft)
+          if (exceedDay <= totalDays) {
+            forecast = `At this pace, exceeds on day ${exceedDay}`
+          } else {
+            const projectedPct = Math.round((dailyRate * totalDays / effectiveBudget) * 100)
+            forecast = `On track — projected ${projectedPct}% used`
+          }
+        }
+
+        return { ...c, spent, pct, over, warning: !over && pct >= 80, effectiveBudget, rolloverAmt, forecast }
       })
       .sort((a, b) => b.pct - a.pct)
       .slice(0, 4)
-  }, [categories, transactions, currentMonth])
+  }, [categories, transactions, currentMonth, lastMonth, getDaysInMonth, dayISO])
+
+  // #12 Spending insights
+  const insights = useMemo(() => {
+    if (transactions.length === 0) return []
+    const result: string[] = []
+
+    // Biggest MoM spending increase by category
+    const catChanges = categories
+      .filter(c => c.type === 'expense')
+      .map(c => {
+        const cur  = transactions.filter(t => t.type === 'expense' && t.category === c.id && getMonthKey(t.date) === currentMonth).reduce((s, t) => s + t.amount, 0)
+        const prev = transactions.filter(t => t.type === 'expense' && t.category === c.id && getMonthKey(t.date) === lastMonth).reduce((s, t) => s + t.amount, 0)
+        return { name: c.name, cur, prev, pct: prev > 0 ? ((cur - prev) / prev) * 100 : null }
+      })
+      .filter(x => x.pct !== null && x.pct > 10 && x.cur > 0)
+      .sort((a, b) => b.pct! - a.pct!)
+    if (catChanges.length > 0) {
+      const top = catChanges[0]
+      result.push(`Biggest increase: ${top.name} +${top.pct!.toFixed(0)}% vs last month`)
+    }
+
+    // Budget status
+    if (budgetItems.length > 0) {
+      const overCount = budgetItems.filter(b => b.over).length
+      if (overCount > 0) {
+        result.push(`Over budget in ${overCount} categor${overCount > 1 ? 'ies' : 'y'} this month`)
+      } else {
+        result.push(`On track — under budget in all ${budgetItems.length} tracked categor${budgetItems.length > 1 ? 'ies' : 'y'}`)
+      }
+    }
+
+    // Top spending category share
+    if (result.length < 3 && monthlyTotals.expenses > 0) {
+      const topCat = categories
+        .filter(c => c.type === 'expense')
+        .map(c => ({ name: c.name, spent: transactions.filter(t => t.type === 'expense' && t.category === c.id && getMonthKey(t.date) === currentMonth).reduce((s, t) => s + t.amount, 0) }))
+        .filter(x => x.spent > 0)
+        .sort((a, b) => b.spent - a.spent)[0]
+      if (topCat) {
+        const share = Math.round((topCat.spent / monthlyTotals.expenses) * 100)
+        result.push(`Top spend: ${topCat.name} at ${share}% of total expenses`)
+      }
+    }
+
+    return result
+  }, [categories, transactions, currentMonth, lastMonth, budgetItems, monthlyTotals.expenses, getMonthKey])
 
   const fmt = (n: number) => formatCurrency(n, settings.currencySymbol, settings.currencyLocale)
 
@@ -250,6 +332,21 @@ export default function Dashboard({ data }: Props) {
         </GlassCard>
 
         <div className="right-col">
+          {/* Spending insights strip */}
+          {insights.length > 0 && (
+            <GlassCard className="card-appear" style={{ marginBottom: 14 }}>
+              <div className="insights-header">
+                <Lightbulb size={13} color="var(--accent)" />
+                <span className="insights-title">Insights</span>
+              </div>
+              <div className="insights-list">
+                {insights.map((text, i) => (
+                  <div key={i} className="insight-row">{text}</div>
+                ))}
+              </div>
+            </GlassCard>
+          )}
+
           {/* Budget tracker */}
           {budgetItems.length > 0 && (
             <GlassCard className="card-appear" style={{ marginBottom: 14 }}>
@@ -263,15 +360,23 @@ export default function Dashboard({ data }: Props) {
                       <div className="budget-top">
                         <span className="budget-name">{b.name}</span>
                         <span className="budget-amt" style={{ color: b.over ? 'var(--expense)' : b.warning ? 'var(--warning)' : 'var(--text-secondary)' }}>
-                          {fmt(b.spent)} / {fmt(b.budget!)}
+                          {fmt(b.spent)} / {fmt(b.effectiveBudget)}
                         </span>
                       </div>
+                      {b.rolloverAmt > 0 && (
+                        <div className="budget-rollover">+{fmt(b.rolloverAmt)} rolled over</div>
+                      )}
                       <div className="budget-track">
                         <div className="budget-fill" style={{
                           width: `${b.pct}%`,
                           background: b.over ? 'var(--expense)' : b.warning ? 'var(--warning)' : b.color
                         }} />
                       </div>
+                      {b.forecast && (
+                        <div className="budget-forecast" style={{ color: b.over ? 'var(--expense)' : b.warning ? 'var(--warning)' : 'var(--text-muted)' }}>
+                          {b.forecast}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -296,7 +401,7 @@ export default function Dashboard({ data }: Props) {
                 </div>
               ) : (
                 recentTransactions.map((t, i) => (
-                  <TransactionItem key={t.id} transaction={t} categories={categories} settings={settings} animDelay={i * 35} />
+                  <TransactionItem key={t.id} transaction={t} categories={categories} accounts={accounts} settings={settings} animDelay={i * 35} />
                 ))
               )}
             </div>

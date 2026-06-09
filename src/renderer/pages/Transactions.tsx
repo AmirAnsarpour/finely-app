@@ -33,7 +33,7 @@ function groupByDate(txs: Transaction[], formatDate: (iso: string) => string): T
 }
 
 export default function Transactions({ data }: Props) {
-  const { transactions, categories, settings, updateTransaction, deleteTransaction, exportCSV, refreshing } = data
+  const { transactions, categories, accounts, settings, updateTransaction, deleteTransaction, exportCSV, refreshing } = data
   const { toast } = useToast()
   const { formatDate } = useCalendar()
 
@@ -235,10 +235,10 @@ export default function Transactions({ data }: Props) {
               <div className="date-items">
                 {group.items.map((t, i) => (
                   expandedId === t.id ? (
-                    <InlineEditRow key={t.id} transaction={t} categories={categories} settings={settings}
+                    <InlineEditRow key={t.id} transaction={t} categories={categories} accounts={accounts} settings={settings}
                       onSave={handleSave} onCancel={() => setExpandedId(null)} />
                   ) : (
-                    <TransactionItem key={t.id} transaction={t} categories={categories} settings={settings}
+                    <TransactionItem key={t.id} transaction={t} categories={categories} accounts={accounts} settings={settings}
                       onEdit={() => setExpandedId(t.id)} onDelete={id => setConfirmDelete(id)}
                       animDelay={Math.min(i * 25, 200)} />
                   )
