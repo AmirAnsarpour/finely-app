@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 interface UpdateInfo {
   hasUpdate: boolean
   latestVersion: string
