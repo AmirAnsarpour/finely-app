@@ -26,5 +26,41 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (_: IpcRendererEvent, pct: number) => cb(pct)
     ipcRenderer.on('update-progress', handler)
     return () => ipcRenderer.removeListener('update-progress', handler)
-  }
+  },
+
+  aiHasKey: () => ipcRenderer.invoke('ai-has-key'),
+  aiSaveKey: (key: string) => ipcRenderer.invoke('ai-save-key', key),
+  aiClearKey: () => ipcRenderer.invoke('ai-clear-key'),
+  aiRunAnalysis: (params: {
+    provider: string
+    model: string
+    baseUrl?: string
+    systemPrompt: string
+    userPrompt: string
+  }) => ipcRenderer.invoke('ai-run-analysis', params),
+  aiListModels: (params: { provider: string; baseUrl?: string; apiKey?: string }) => ipcRenderer.invoke('ai-list-models', params),
+  aiChatStream: (params: {
+    provider: string
+    model: string
+    baseUrl?: string
+    systemPrompt: string
+    messages: { role: 'user' | 'assistant'; content: string }[]
+  }) => ipcRenderer.invoke('ai-chat-stream', params),
+  onAIChatChunk: (cb: (chunk: string) => void) => {
+    const handler = (_: IpcRendererEvent, chunk: string) => cb(chunk)
+    ipcRenderer.on('ai-chat-chunk', handler)
+    return () => ipcRenderer.removeListener('ai-chat-chunk', handler)
+  },
+
+  vaultStatus: () => ipcRenderer.invoke('vault-status'),
+  vaultUnlock: (passphrase: string) => ipcRenderer.invoke('vault-unlock', passphrase),
+  vaultEnable: (passphrase: string) => ipcRenderer.invoke('vault-enable', passphrase),
+  vaultDisable: () => ipcRenderer.invoke('vault-disable'),
+  vaultChangePassphrase: (passphrase: string) => ipcRenderer.invoke('vault-change-passphrase', passphrase),
+  vaultLock: () => ipcRenderer.invoke('vault-lock'),
+  vaultTryOsUnlock: () => ipcRenderer.invoke('vault-try-os-unlock'),
+  vaultEnableOsUnlock: () => ipcRenderer.invoke('vault-enable-os-unlock'),
+  vaultDisableOsUnlock: () => ipcRenderer.invoke('vault-disable-os-unlock'),
+
+  setTrayBalance: (text: string) => ipcRenderer.send('tray-set-balance', text)
 })

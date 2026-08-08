@@ -8,6 +8,7 @@ import type { Account } from '../types'
 import type { UseDataReturn } from '../hooks/useData'
 import { useToast } from '../components/Toast'
 import { formatCurrency } from '../utils/formatters'
+import { accountBalance } from '../utils/accountBalance'
 
 interface Props { data: UseDataReturn }
 
@@ -184,8 +185,9 @@ export default function Accounts({ data }: Props) {
       const accTx = transactions.filter(t => t.accountId === acc.id)
       const totalIncome   = accTx.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
       const totalExpenses = accTx.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-      const balance = totalIncome - totalExpenses
-      return { ...acc, balance, totalIncome, totalExpenses, txCount: accTx.length }
+      const txCount = transactions.filter(t => t.accountId === acc.id || t.toAccountId === acc.id).length
+      const balance = accountBalance(transactions, acc.id)
+      return { ...acc, balance, totalIncome, totalExpenses, txCount }
     })
   }, [accounts, transactions])
 

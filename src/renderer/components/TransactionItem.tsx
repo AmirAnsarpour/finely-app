@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Trash2, ArrowLeftRight } from 'lucide-react'
 import type { Account, Transaction, Category, AppSettings } from '../types'
 import CategoryIcon from './CategoryIcon'
 import { formatCurrency } from '../utils/formatters'
@@ -26,8 +26,10 @@ export default function TransactionItem({
   animDelay = 0
 }: TransactionItemProps) {
   const { formatDateShort } = useCalendar()
+  const isTransfer = transaction.type === 'transfer'
   const category = categories.find(c => c.id === transaction.category)
   const account  = transaction.accountId ? accounts.find(a => a.id === transaction.accountId) : undefined
+  const toAccount = transaction.toAccountId ? accounts.find(a => a.id === transaction.toAccountId) : undefined
   const isIncome = transaction.type === 'income'
   const [tip, setTip] = useState<{ x: number; y: number } | null>(null)
 
@@ -39,18 +41,30 @@ export default function TransactionItem({
       onMouseMove={transaction.note ? e => setTip({ x: e.clientX, y: e.clientY }) : undefined}
       onMouseLeave={transaction.note ? () => setTip(null) : undefined}
     >
-      <CategoryIcon
-        icon={category?.icon ?? 'tag'}
-        color={category?.color ?? '#94a3b8'}
-        size={18}
-        showBg
-        bgSize={42}
-      />
+      {isTransfer ? (
+        <div style={{
+          width: 42, height: 42, borderRadius: '50%', background: 'var(--accent-dim)',
+          border: '1px solid rgba(108,142,245,0.4)', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', flexShrink: 0
+        }}>
+          <ArrowLeftRight size={18} color="var(--accent)" strokeWidth={2} />
+        </div>
+      ) : (
+        <CategoryIcon
+          icon={category?.icon ?? 'tag'}
+          color={category?.color ?? '#94a3b8'}
+          size={18}
+          showBg
+          bgSize={42}
+        />
+      )}
 
       <div className="tx-row__info">
         <div className="tx-row__name-row">
-          <span className="tx-row__name">{category?.name ?? 'Unknown'}</span>
-          {account && (
+          <span className="tx-row__name">
+            {isTransfer ? `${account?.name ?? 'Unknown'} → ${toAccount?.name ?? 'Unknown'}` : (category?.name ?? 'Unknown')}
+          </span>
+          {!isTransfer && account && (
             <span className="tx-row__account" style={{ borderColor: `${account.color}55`, color: account.color }}>
               {account.name}
             </span>
@@ -78,8 +92,9 @@ export default function TransactionItem({
       )}
 
       <div className="tx-row__right">
-        <span className={`tx-row__amount ${isIncome ? 'income' : 'expense'}`}>
-          {isIncome ? '+' : '-'}
+        <span className={`tx-row__amount ${isTransfer ? '' : isIncome ? 'income' : 'expense'}`}
+          style={isTransfer ? { color: 'var(--accent)' } : undefined}>
+          {isTransfer ? '⇄ ' : isIncome ? '+' : '-'}
           {formatCurrency(transaction.amount, settings.currencySymbol, settings.currencyLocale)}
         </span>
         <span className="tx-row__date">{formatDateShort(transaction.date)}</span>

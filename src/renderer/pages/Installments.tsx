@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Plus, Minus, Pencil, Trash2, CreditCard, Check, ClipboardList,
-  User, Calendar, CheckCircle2, Circle, AlertTriangle
+  User, Calendar, CheckCircle2, Circle, AlertTriangle, Sparkles
 } from 'lucide-react'
 import GlassCard from '../components/GlassCard'
 import Modal from '../components/Modal'
+import MarkdownView from '../components/MarkdownView'
 import DatePicker from '../components/DatePicker'
 import ColorPicker, { DEFAULT_COLOR_PRESETS } from '../components/ColorPicker'
 import type { Installment, InstallmentPayment } from '../types'
@@ -13,6 +14,8 @@ import { useToast } from '../components/Toast'
 import { generateId, todayString } from '../utils/formatters'
 import { normalizeDigits } from '../utils/numerals'
 import { useCalendar } from '../utils/calendarContext'
+import { fileManager } from '../utils/fileManager'
+import { askAI, languageInstruction, MARKDOWN_FORMAT_INSTRUCTION } from '../utils/aiClient'
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -394,6 +397,46 @@ export default function Installments({ data }: { data: UseDataReturn }) {
   const active = installments.filter(inst => inst.payments.some(p => !p.isPaid))
   const completed = installments.filter(inst => inst.payments.length > 0 && inst.payments.every(p => p.isPaid))
 
+  // ── AI payoff strategy — self-contained, only needs settings ──
+  const [hasAIKey, setHasAIKey] = useState(false)
+  useEffect(() => { fileManager.aiHasKey().then(setHasAIKey) }, [])
+  const [strategyOpen, setStrategyOpen] = useState(false)
+  const [strategyContent, setStrategyContent] = useState<string | null>(null)
+  const [strategyLoading, setStrategyLoading] = useState(false)
+  const [strategyError, setStrategyError] = useState<string | null>(null)
+
+  const handleAskStrategy = async () => {
+    setStrategyOpen(true)
+    setStrategyContent(null)
+    setStrategyError(null)
+    setStrategyLoading(true)
+    try {
+      const lines = [`Currency: ${settings.currencySymbol}`, 'Active debts:']
+      active.forEach(inst => {
+        const remaining = inst.payments.filter(p => !p.isPaid).reduce((s, p) => s + p.amount, 0)
+        const monthsLeft = inst.payments.filter(p => !p.isPaid).length
+        const next = getNextUnpaid(inst)
+        lines.push(
+          `- ${inst.name}${inst.creditor ? ` (${inst.creditor})` : ''}: monthly ${inst.monthlyAmount.toFixed(2)}, ` +
+          `remaining balance ${remaining.toFixed(2)}, ${monthsLeft} payment(s) left, next due ${next?.dueDate ?? 'n/a'}`
+        )
+      })
+      const systemPrompt =
+        `You are a personal finance analyst specializing in debt payoff strategy. You receive a list of someone's ` +
+        `active debts/installments with their monthly payment, remaining balance, and payments left — no interest ` +
+        `rate is given, so reason from balance and monthly burden alone (avalanche = highest balance first, ` +
+        `snowball = smallest balance first for motivation). Recommend a payoff order with a one-sentence reason per ` +
+        `item, and state which general strategy you leaned on and why. ${languageInstruction(settings)}\n\n` +
+        MARKDOWN_FORMAT_INSTRUCTION
+      const content = await askAI(settings, 'debt-strategy', systemPrompt, lines.join('\n'))
+      setStrategyContent(content)
+    } catch (err) {
+      setStrategyError(err instanceof Error ? err.message : 'Failed to get a strategy')
+    } finally {
+      setStrategyLoading(false)
+    }
+  }
+
   // Sort active: overdue first, then by next due date
   const sortedActive = [...active].sort((a, b) => {
     const nextA = getNextUnpaid(a)
@@ -472,9 +515,16 @@ export default function Installments({ data }: { data: UseDataReturn }) {
           <h1 className="page-title">Installments</h1>
           <p className="page-sub">Track your loans, payment plans, and debts</p>
         </div>
-        <button className="btn-add" onClick={() => setShowAddModal(true)}>
-          <Plus size={15} /> Add Installment
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {hasAIKey && active.length > 1 && (
+            <button className="btn-secondary" onClick={handleAskStrategy}>
+              <Sparkles size={14} /> AI Payoff Strategy
+            </button>
+          )}
+          <button className="btn-add" onClick={() => setShowAddModal(true)}>
+            <Plus size={15} /> Add Installment
+          </button>
+        </div>
       </div>
 
       {installments.length === 0 ? (
@@ -573,6 +623,17 @@ export default function Installments({ data }: { data: UseDataReturn }) {
           <button className="btn-ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
           <button className="btn-danger" onClick={handleConfirmDelete}>Delete</button>
         </div>
+      </Modal>
+
+      {/* AI payoff strategy */}
+      <Modal open={strategyOpen} onClose={() => setStrategyOpen(false)} title="AI Payoff Strategy" width={480}>
+        {strategyLoading && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
+            <div className="spinner" />
+          </div>
+        )}
+        {strategyError && <p className="form-error">{strategyError}</p>}
+        {strategyContent && <MarkdownView content={strategyContent} />}
       </Modal>
     </div>
   )

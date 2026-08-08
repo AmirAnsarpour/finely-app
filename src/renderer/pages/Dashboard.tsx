@@ -152,7 +152,9 @@ export default function Dashboard({ data }: Props) {
   const fmt = (n: number) => formatCurrency(n, settings.currencySymbol, settings.currencyLocale)
 
   const netWorthData = useMemo(() => {
-    const liquidBalance = transactions.reduce((s, t) => t.type === 'income' ? s + t.amount : s - t.amount, 0)
+    // Transfers move money between the user's own accounts, so they net to zero here.
+    const liquidBalance = transactions.reduce((s, t) =>
+      t.type === 'income' ? s + t.amount : t.type === 'expense' ? s - t.amount : s, 0)
     const goalSavings = goals.reduce((s, g) => s + g.currentAmount, 0)
     const remainingDebt = installments.reduce((s, inst) =>
       s + inst.payments.filter(p => !p.isPaid).reduce((ps, p) => ps + p.amount, 0), 0)

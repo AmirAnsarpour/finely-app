@@ -10,7 +10,7 @@ Track your income, expenses, investments, and accounts entirely offline.
 Your data is plain JSON files on your own machine. Nothing leaves your device.
 
 [![Version](https://img.shields.io/badge/version-1.1.0-6c8ef5?style=flat-square)](https://github.com/AmirAnsarpour/finely-app)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey?style=flat-square)](#build-from-source)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey?style=flat-square)](#build-from-source)
 [![Built with Electron](https://img.shields.io/badge/built%20with-Electron-47848f?style=flat-square)](https://www.electronjs.org/)
 
 [**Build from Source**](#build-from-source) · [**Features**](#features)
@@ -57,8 +57,15 @@ Get an instant snapshot of your financial health each month:
 Track multiple bank cards, wallets, or cash accounts separately:
 - Each account shows its **current balance**, total income received, and total expenses spent
 - When adding a transaction, optionally assign it to an account
-- Finely **blocks an expense** if the selected account doesn't have enough balance
+- **Transfer money between accounts** without it counting as income or expense
+- Finely **blocks an expense or transfer** if the selected account doesn't have enough balance
 - Transactions without an account are "unassigned" — they still count in your global balance
+
+### 🖥️ System Tray
+- Finely keeps running in the system tray when you close the window — it doesn't quit
+- **Click** the tray icon for Quick Add — a small popup to log a transaction without opening the full app
+- **Right-click** for the menu — Open App (as you left it) or Quit Finely
+- Optionally show your total balance right on the tray icon — an always-visible label on macOS, a hover tooltip on Windows/Linux (off by default, toggle in Settings)
 
 ### 📈 Reports
 - Monthly breakdown with a category pie chart and daily spending chart
@@ -80,13 +87,35 @@ Track multiple bank cards, wallets, or cash accounts separately:
 - View **cost basis** (total amount you paid) alongside current value
 - See **P&L** — profit or loss — per holding
 
+### 🤖 AI Insights (optional, bring your own key)
+Everything here lives on its own **AI Insights** page and is completely off by default — nothing is sent anywhere until you add an API key in Settings.
+
+- **Any provider** — OpenAI, Anthropic (Claude), Google (Gemini), or any OpenAI-compatible endpoint (Groq, local models, etc.). Finely auto-detects which models your key can access, so you pick from a dropdown instead of guessing model names
+- **Monthly spending analysis** — a written breakdown of what's driving your spending and how to manage it better, rendered as formatted text (RTL-aware for Persian). Run it on demand or turn on automatic monthly analysis
+- **Chat with your data** — ask free-form questions about your spending, streamed back token-by-token
+- **Natural-language quick add** — type "20 bucks for lunch yesterday" and Finely fills in the amount, category, and date for you to review before saving
+- **Smart category suggestions** — as you type a transaction note, get an AI-backed category suggestion when your own history doesn't have an obvious match
+- **AI-suggested budgets** — one click to get suggested monthly budgets per category, with a review-and-apply step
+- **Ask about a category** — drill into any category from the Reports page and ask the AI about it directly
+- **Debt payoff strategy** (Installments) and **savings goal suggestions** (Goals)
+- **Token usage log** — see how many tokens each feature has used over time (counts only, never a fabricated dollar estimate — pricing varies too much per model/provider to keep accurate)
+- **Privacy by design:** only aggregated category totals are ever sent — never transaction notes, tags, or account names. The API key is encrypted with your OS keychain (Keychain / DPAPI / libsecret) and stored on your device only, never in the plain-JSON data folder. No official SDKs are bundled either — every provider is called over plain HTTPS, so nothing is hardcoded to one vendor
+
+### 🔐 Data Encryption (optional)
+- Lock your entire data folder with a passphrase — every JSON file is encrypted (AES-256-GCM, scrypt-derived key), so even a synced Dropbox/Drive folder is unreadable without it
+- Off by default; turn it on any time from Settings or during first-run setup
+- **Unlock with Touch ID** on macOS, or automatically once you're signed into your device on Windows/Linux — both optional, off by default, and toggled independently from encryption itself
+- The passphrase is never stored anywhere. If you forget it, the data cannot be recovered — there's no reset
+
 ### ⚙️ Settings
+- **First-run setup wizard:** currency, data folder location, and optional encryption — all in one guided flow
 - **Themes:** Light, Dark, Deep Black, or match your system
 - **Currency:** 20+ currencies with correct formatting
 - **Calendar:** Gregorian or Jalali (Iranian / Shamsi) — the whole app switches
 - **Week start day:** Sunday, Monday, or Saturday
 - **Data folder:** change where your data is saved (e.g. point it at Dropbox)
 - **Backup / Restore:** export everything as a ZIP, import it on any machine
+- **Auto-update** (Windows portable build): checks GitHub releases and installs updates in place
 
 ---
 
@@ -147,6 +176,17 @@ This produces two files in the `release/` folder:
 - `Finely-x.x.x-portable.exe` — portable single file, no install needed
 - `Finely-x.x.x-setup.exe` — traditional NSIS installer
 
+#### macOS — build on a Mac
+
+```bash
+# Build the app, then package it
+bun run package:mac
+```
+
+This produces two files per architecture in the `release/` folder:
+- `Finely-x.x.x-x64.dmg` / `Finely-x.x.x-arm64.dmg` — disk image installer
+- `Finely-x.x.x-x64-mac.zip` / `Finely-x.x.x-arm64-mac.zip` — zipped app bundle
+
 #### Linux — build on a Linux machine
 
 ```bash
@@ -159,7 +199,7 @@ This produces three files in the `release/` folder:
 - `Finely-x.x.x-amd64.deb` — for Debian / Ubuntu
 - `Finely-x.x.x.x86_64.rpm` — for Fedora / openSUSE
 
-> **Cross-compiling:** Building a Windows `.exe` from Linux (or vice versa) requires extra setup (Wine on Linux, or a Windows VM). The easiest approach is to build on the target OS.
+> **Cross-compiling:** Building for one OS from another (e.g. a Windows `.exe` from Linux) requires extra setup (Wine on Linux, or a Windows VM) — and macOS builds can only be produced on a Mac. The easiest approach is to build on the target OS.
 
 ---
 
@@ -172,13 +212,14 @@ This produces three files in the `release/` folder:
 | `bun run preview` | Preview the compiled build without packaging |
 | `bun run package` | Build + package for the **current** OS |
 | `bun run package:win` | Build + package for **Windows** (portable + NSIS) |
+| `bun run package:mac` | Build + package for **macOS** (dmg + zip, Intel + Apple Silicon) |
 | `bun run package:linux` | Build + package for **Linux** (AppImage + deb + rpm) |
 
 ---
 
 ## Where is my data?
 
-All your data is stored as readable JSON files on your machine. No database, no encryption, no lock-in.
+All your data is stored as readable JSON files on your machine. No database, no lock-in — and no encryption unless you turn it on yourself in Settings.
 
 ```
 <data folder>/
@@ -189,13 +230,20 @@ All your data is stored as readable JSON files on your machine. No database, no 
   goals.json
   installments.json
   investments.json
+  analyses.json         # saved AI spending analyses (only if you've used AI Insights)
+  ai-usage.json         # AI token usage log (only if you've used AI Insights)
+  ai-chat.json          # AI chat history (only if you've used the Chat tab)
+  .finely-vault.json    # present only if you've turned on Data Encryption
 ```
+
+If Data Encryption is on, every file above except `.finely-vault.json` itself is stored as ciphertext rather than plain JSON — the app decrypts on the fly once you unlock it.
 
 **Default data folder locations:**
 
 | OS | Default path |
 |---|---|
 | Windows | `%APPDATA%\finely` |
+| macOS | `~/Library/Application Support/finely` |
 | Linux | `~/.config/finely` |
 
 You can change this path any time in **Settings → Data Storage**.
@@ -231,16 +279,22 @@ Point the data folder to a cloud-synced folder:
 ## FAQ
 
 **Does Finely send my data anywhere?**  
-No. The app is fully offline. The only network request it makes is fetching live investment prices from Nobitex (only on the Investments page, and only if you use that feature).
+No, by default. The app is fully offline except for two opt-in features: fetching live investment prices from Nobitex (Investments page), and AI Insights, which — only if you add an API key — sends aggregated category totals (never transaction notes, tags, or account names) to the AI provider you choose.
 
-**Can I use it without the Investments feature?**  
-Yes. Investments are completely optional. Every other feature works with no internet connection at all.
+**Can I use it without the Investments or AI Insights features?**  
+Yes. Both are completely optional. Every other feature works with no internet connection at all.
+
+**What happens if I forget my encryption passphrase?**  
+Your data cannot be recovered. The passphrase is never stored anywhere — not even by Finely itself — so there's no reset or backdoor. Write it down somewhere safe if you turn encryption on.
+
+**Is "Unlock with Touch ID" / automatic unlock actually secure?**  
+It's a convenience trade-off, not a security upgrade over the passphrase. Enabling it wraps your encryption key with your OS's own secure storage (Keychain / DPAPI / libsecret), so anyone already signed into your device account could open your Finely data too — you're trading the second factor (the passphrase) for not having to type it every launch. It's off by default and fully optional; the passphrase field always works as a fallback even when it's on.
 
 **The app won't open on Windows (SmartScreen warning)?**  
 Click **More info**, then **Run anyway**. This happens because the app isn't code-signed with a paid certificate. The source code is fully open — you can build it yourself if you prefer.
 
-**Can I run it on macOS?**  
-macOS is not officially supported yet (no macOS build target is configured), but you can run it in development mode with `bun run dev` on a Mac.
+**The app won't open on macOS ("unidentified developer")?**  
+Right-click the app in Finder, choose **Open**, then confirm **Open** in the dialog. This happens for the same reason as the Windows warning above — the build isn't signed with a paid Apple Developer certificate yet.
 
 ---
 

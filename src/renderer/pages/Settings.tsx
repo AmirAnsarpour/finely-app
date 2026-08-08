@@ -11,20 +11,479 @@ import {
 } from "lucide-react";
 import Select from "../components/Select";
 import GlassCard from "../components/GlassCard";
+import Modal from "../components/Modal";
 import type { UseDataReturn } from "../hooks/useData";
+import type { UseAIAnalysisReturn } from "../hooks/useAIAnalysis";
+import type { AIProvider, AIResponseLanguage, VaultStatus } from "../types";
 import { CURRENCIES } from "../utils/formatters";
+import { fileManager } from "../utils/fileManager";
+import { friendlyAIErrorMessage } from "../utils/aiError";
 import { useToast } from "../components/Toast";
 import { applyTheme } from "../App";
 
 interface Props {
   data: UseDataReturn;
+  aiData: UseAIAnalysisReturn;
+}
+
+const AI_PROVIDER_OPTIONS = [
+  { value: "openai", label: "OpenAI" },
+  { value: "anthropic", label: "Anthropic (Claude)" },
+  { value: "google", label: "Google (Gemini)" },
+  { value: "custom", label: "Custom (OpenAI-compatible)" },
+];
+
+const AI_MODEL_PLACEHOLDER: Record<AIProvider, string> = {
+  openai: "e.g. gpt-4o",
+  anthropic: "e.g. claude-opus-5",
+  google: "e.g. gemini-2.5-pro",
+  custom: "model id your endpoint expects",
+};
+
+const AI_KEY_URL: Record<AIProvider, string | null> = {
+  openai: "https://platform.openai.com/api-keys",
+  anthropic: "https://console.anthropic.com/settings/keys",
+  google: "https://aistudio.google.com/apikey",
+  custom: null,
+};
+
+function AISettingsSection({ data, aiData }: { data: UseDataReturn; aiData: UseAIAnalysisReturn }) {
+  const { settings, updateSettings } = data;
+  const { hasKey, loading: aiLoading, error, saveKey, clearKey } = aiData;
+  const { toast } = useToast();
+
+  const [provider, setProvider] = useState<AIProvider>(settings.aiProvider ?? "anthropic");
+  const [model, setModel] = useState(settings.aiModel ?? "");
+  const [baseUrl, setBaseUrl] = useState(settings.aiBaseUrl ?? "");
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [editingKey, setEditingKey] = useState(!hasKey);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [manualModelEntry, setManualModelEntry] = useState(true);
+  const [fetchingModels, setFetchingModels] = useState(false);
+
+  // aiData resolves its own hasKey asynchronously (independent of the app's
+  // main loading gate), so sync the key-entry view once that resolves.
+  useEffect(() => {
+    if (!aiLoading) setEditingKey(!hasKey);
+  }, [aiLoading]);
+  const [saving, setSaving] = useState(false);
+
+  const keyUrl = AI_KEY_URL[provider];
+  const showModelDropdown = availableModels.length > 0 && !manualModelEntry;
+  const canFetchModels = (apiKeyInput.trim() || hasKey) && (provider !== "custom" || baseUrl.trim());
+
+  const handleProviderChange = (v: string) => {
+    const next = v as AIProvider;
+    setProvider(next);
+    setAvailableModels([]);
+    setManualModelEntry(true);
+    updateSettings({ aiProvider: next });
+  };
+
+  const handleModelPicked = (v: string) => {
+    setModel(v);
+    updateSettings({ aiModel: v });
+  };
+
+  const handleModelInputBlur = () => {
+    if (model.trim()) updateSettings({ aiModel: model.trim() });
+  };
+
+  const handleBaseUrlBlur = () => {
+    if (provider === "custom") updateSettings({ aiBaseUrl: baseUrl.trim() });
+  };
+
+  const handleFetchModels = async () => {
+    setFetchingModels(true);
+    try {
+      const models = await fileManager.listAIModels(
+        provider,
+        provider === "custom" ? baseUrl.trim() : undefined,
+        apiKeyInput.trim() || undefined
+      );
+      if (models.length === 0) {
+        toast("No models returned — enter one manually", "info");
+        setAvailableModels([]);
+        setManualModelEntry(true);
+      } else {
+        setAvailableModels(models);
+        setManualModelEntry(false);
+        if (!models.includes(model)) setModel(models[0]);
+      }
+    } catch (e) {
+      toast(friendlyAIErrorMessage(e), "error");
+    } finally {
+      setFetchingModels(false);
+    }
+  };
+
+  const handleSaveKey = async () => {
+    if (!apiKeyInput.trim()) { toast("Enter an API key", "info"); return; }
+    setSaving(true);
+    try {
+      // Provider/model/base URL aren't secret and are saved as soon as you
+      // pick them (see handleProviderChange etc.) — bundled here too so a
+      // first-time setup persists everything in one click, in any order.
+      await updateSettings({
+        aiProvider: provider,
+        aiModel: model.trim() || undefined,
+        aiBaseUrl: provider === "custom" ? baseUrl.trim() : undefined,
+      });
+      await saveKey(apiKeyInput.trim());
+      setApiKeyInput("");
+      setEditingKey(false);
+      toast("API key saved");
+    } catch (e) {
+      toast(friendlyAIErrorMessage(e), "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveKey = async () => {
+    await clearKey();
+    setEditingKey(true);
+    toast("API key removed", "info");
+  };
+
+  return (
+    <GlassCard className="card-appear">
+      <h2 className="section-title">AI Spending Analysis</h2>
+      <p className="section-sub">
+        Bring your own API key from any provider — only monthly category totals are sent, never transaction notes, tags, or account names
+      </p>
+      <div className="settings-section">
+        <div className="setting-row">
+          <div>
+            <p className="setting-name">Provider</p>
+            <p className="setting-desc">Which AI API the analysis request goes to</p>
+          </div>
+          <div style={{ minWidth: 220 }}>
+            <Select value={provider} onChange={handleProviderChange} options={AI_PROVIDER_OPTIONS} />
+          </div>
+        </div>
+
+        {provider === "custom" && (
+          <div className="setting-row setting-row--col">
+            <div>
+              <p className="setting-name">Base URL</p>
+              <p className="setting-desc">An OpenAI-compatible endpoint, e.g. https://api.groq.com/openai/v1</p>
+            </div>
+            <input
+              className="form-input"
+              value={baseUrl}
+              onChange={(e) => { setBaseUrl(e.target.value); setAvailableModels([]); setManualModelEntry(true); }}
+              onBlur={handleBaseUrlBlur}
+              placeholder="https://…/v1"
+            />
+          </div>
+        )}
+
+        <div className="setting-row setting-row--col">
+          <div>
+            <p className="setting-name">Model</p>
+            <p className="setting-desc">
+              {showModelDropdown ? "Choose from the models your key can access" : "Type the exact model id, or fetch what your key can access"}
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {showModelDropdown ? (
+              <div style={{ flex: 1 }}>
+                <Select value={model} onChange={handleModelPicked} options={availableModels.map((m) => ({ value: m, label: m }))} />
+              </div>
+            ) : (
+              <input
+                className="form-input"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                onBlur={handleModelInputBlur}
+                placeholder={AI_MODEL_PLACEHOLDER[provider]}
+                style={{ flex: 1 }}
+              />
+            )}
+            <button className="btn-secondary" onClick={handleFetchModels} disabled={fetchingModels || !canFetchModels} title="List the models your API key can access">
+              {fetchingModels ? "Checking…" : "Fetch Models"}
+            </button>
+          </div>
+          {showModelDropdown && (
+            <button
+              type="button"
+              onClick={() => setManualModelEntry(true)}
+              style={{ alignSelf: "flex-start", background: "none", border: "none", padding: 0, color: "var(--text-muted)", fontSize: 11, cursor: "pointer", textDecoration: "underline" }}
+            >
+              Type a model id manually instead
+            </button>
+          )}
+        </div>
+
+        <div className="setting-row setting-row--col">
+          <div>
+            <p className="setting-name">API Key</p>
+            <p className="setting-desc">
+              Stored encrypted on this device only — never written to the plain-JSON data folder.
+              {keyUrl && (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    onClick={() => window.electronAPI.openExternal(keyUrl)}
+                    style={{ background: "none", border: "none", padding: 0, color: "var(--accent)", fontSize: 11, cursor: "pointer", textDecoration: "underline" }}
+                  >
+                    Get a key →
+                  </button>
+                </>
+              )}
+            </p>
+          </div>
+          {hasKey && !editingKey ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span className="setting-desc" style={{ color: "var(--income)" }}>● Key configured</span>
+              <button className="btn-secondary" onClick={() => setEditingKey(true)}>Change</button>
+              <button className="btn-secondary" onClick={handleRemoveKey}>Remove</button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                className="form-input"
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="sk-…"
+                style={{ flex: 1 }}
+              />
+              <button className="btn-secondary" onClick={handleSaveKey} disabled={saving}>
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="form-group">
+          <label className="rollover-toggle">
+            <span className="rollover-toggle__text">
+              <span className="form-label" style={{ margin: 0 }}>Analyze automatically every month</span>
+              <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 400 }}>Runs once when a new month starts, if a key is configured</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={!!settings.aiAutoMonthly}
+              onChange={(e) => updateSettings({ aiAutoMonthly: e.target.checked })}
+              style={{ display: "none" }}
+            />
+            <span className={`rollover-toggle__switch ${settings.aiAutoMonthly ? "rollover-toggle__switch--on" : ""}`} />
+          </label>
+        </div>
+
+        <div className="setting-row">
+          <div>
+            <p className="setting-name">Response Language</p>
+            <p className="setting-desc">Applies to every AI feature — analysis, chat, suggestions</p>
+          </div>
+          <div style={{ minWidth: 180 }}>
+            <Select
+              value={settings.aiResponseLanguage ?? "auto"}
+              onChange={(v) => updateSettings({ aiResponseLanguage: v as AIResponseLanguage })}
+              options={[
+                { value: "auto", label: "Match my data" },
+                { value: "fa", label: "فارسی" },
+                { value: "en", label: "English" },
+              ]}
+            />
+          </div>
+        </div>
+
+        {error && <p className="form-error">{error}</p>}
+
+        <p className="folder-tip">
+          Once a key is saved, go to the <strong>AI Insights</strong> page in the sidebar to run and read analyses.
+        </p>
+      </div>
+    </GlassCard>
+  );
+}
+
+function SecuritySettingsSection() {
+  const { toast } = useToast();
+  const [status, setStatus] = useState<VaultStatus | null>(null);
+  const [passphrase, setPassphrase] = useState("");
+  const [confirmPassphrase, setConfirmPassphrase] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [confirmDisable, setConfirmDisable] = useState(false);
+
+  const refresh = () => fileManager.vaultStatus().then(setStatus);
+  useEffect(() => { refresh(); }, []);
+
+  const validatePassphrase = () => {
+    if (passphrase.length < 8) { setError("Passphrase must be at least 8 characters"); return false; }
+    if (passphrase !== confirmPassphrase) { setError("Passphrases do not match"); return false; }
+    return true;
+  };
+
+  const handleEnable = async () => {
+    setError("");
+    if (!validatePassphrase()) return;
+    setBusy(true);
+    try {
+      await fileManager.vaultEnable(passphrase);
+      setPassphrase(""); setConfirmPassphrase("");
+      await refresh();
+      toast("Encryption enabled");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to enable encryption");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleChangePassphrase = async () => {
+    setError("");
+    if (!validatePassphrase()) return;
+    setBusy(true);
+    try {
+      await fileManager.vaultChangePassphrase(passphrase);
+      setPassphrase(""); setConfirmPassphrase("");
+      toast("Passphrase changed");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to change passphrase");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDisable = async () => {
+    setBusy(true);
+    try {
+      await fileManager.vaultDisable();
+      await refresh();
+      toast("Encryption disabled", "info");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Failed to disable encryption", "error");
+    } finally {
+      setBusy(false);
+      setConfirmDisable(false);
+    }
+  };
+
+  const handleLock = async () => {
+    await fileManager.vaultLock();
+    window.location.reload();
+  };
+
+  const handleToggleOsUnlock = async (checked: boolean) => {
+    setBusy(true);
+    setError("");
+    try {
+      if (checked) await fileManager.vaultEnableOsUnlock();
+      else await fileManager.vaultDisableOsUnlock();
+      await refresh();
+      toast(checked ? "Enabled" : "Disabled");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!status) return null;
+
+  return (
+    <GlassCard className="card-appear">
+      <h2 className="section-title">Data Encryption</h2>
+      <p className="section-sub">
+        {status.exists
+          ? "Your data folder is encrypted with a passphrase only you know."
+          : "Optional. Locks your entire data folder with a passphrase — useful if this folder syncs to the cloud."}
+      </p>
+      <div className="settings-section">
+        {status.exists ? (
+          <>
+            <div className="setting-row">
+              <div>
+                <p className="setting-name">Status</p>
+                <p className="setting-desc" style={{ color: "var(--income)" }}>● Encrypted</p>
+              </div>
+              <button className="btn-secondary" onClick={handleLock}>Lock Now</button>
+            </div>
+
+            {status.osUnlockAvailable && (
+              <div className="form-group">
+                <label className="rollover-toggle">
+                  <span className="rollover-toggle__text">
+                    <span className="form-label" style={{ margin: 0 }}>{isMac ? "Unlock with Touch ID" : "Unlock automatically on this device"}</span>
+                    <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 400 }}>
+                      {isMac
+                        ? "Skip the passphrase using Touch ID. Anyone signed into this Mac could then open your data too."
+                        : "Skip the passphrase since you're signed into this device. Anyone signed into this account could then open your data too."}
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={status.osUnlockEnabled}
+                    onChange={(e) => handleToggleOsUnlock(e.target.checked)}
+                    disabled={busy}
+                    style={{ display: "none" }}
+                  />
+                  <span className={`rollover-toggle__switch ${status.osUnlockEnabled ? "rollover-toggle__switch--on" : ""}`} />
+                </label>
+              </div>
+            )}
+
+            <div className="setting-row setting-row--col">
+              <div>
+                <p className="setting-name">Change Passphrase</p>
+                <p className="setting-desc">Re-encrypts every data file with a new passphrase</p>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input className="form-input" type="password" placeholder="New passphrase" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} style={{ flex: 1 }} />
+                <input className="form-input" type="password" placeholder="Confirm" value={confirmPassphrase} onChange={(e) => setConfirmPassphrase(e.target.value)} style={{ flex: 1 }} />
+                <button className="btn-secondary" onClick={handleChangePassphrase} disabled={busy || !passphrase}>Change</button>
+              </div>
+            </div>
+
+            <div className="setting-row">
+              <div>
+                <p className="setting-name">Disable Encryption</p>
+                <p className="setting-desc">Decrypts everything back to plain JSON</p>
+              </div>
+              <button className="btn-secondary" onClick={() => setConfirmDisable(true)}>Disable</button>
+            </div>
+          </>
+        ) : (
+          <div className="setting-row setting-row--col">
+            <div>
+              <p className="setting-name">Set a Passphrase</p>
+              <p className="setting-desc">If you forget it, your data cannot be recovered — there's no reset.</p>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input className="form-input" type="password" placeholder="Passphrase" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} style={{ flex: 1 }} />
+              <input className="form-input" type="password" placeholder="Confirm" value={confirmPassphrase} onChange={(e) => setConfirmPassphrase(e.target.value)} style={{ flex: 1 }} />
+              <button className="btn-secondary" onClick={handleEnable} disabled={busy || !passphrase}>Enable</button>
+            </div>
+          </div>
+        )}
+        {error && <p className="form-error">{error}</p>}
+      </div>
+
+      <Modal open={confirmDisable} onClose={() => setConfirmDisable(false)} title="Disable Encryption" width={380}>
+        <p style={{ color: "var(--text-secondary)", marginBottom: 20, lineHeight: 1.6 }}>
+          Your data files will be decrypted and stored as plain readable JSON again. Continue?
+        </p>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button className="btn-ghost" onClick={() => setConfirmDisable(false)}>Cancel</button>
+          <button className="btn-danger" onClick={handleDisable} disabled={busy}>Disable</button>
+        </div>
+      </Modal>
+    </GlassCard>
+  );
 }
 
 type UpdateState = "idle" | "checking" | "no-update" | "available" | "downloading" | "applying" | "error";
 
 const isWindows = window.electronAPI.platform === "win32";
+const isMac = window.electronAPI.platform === "darwin";
 
-export default function Settings({ data }: Props) {
+export default function Settings({ data, aiData }: Props) {
   const { settings, updateSettings, exportZip, importZip, selectFolder } = data;
   const { toast } = useToast();
   const [browsing, setBrowsing] = useState(false);
@@ -179,6 +638,24 @@ export default function Settings({ data }: Props) {
                 />
               </div>
             </div>
+
+            <div className="form-group">
+              <label className="rollover-toggle">
+                <span className="rollover-toggle__text">
+                  <span className="form-label" style={{ margin: 0 }}>{isMac ? "Show balance in menu bar" : "Show balance in tray tooltip"}</span>
+                  <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 400 }}>
+                    {isMac ? "Displays your total balance next to the tray icon" : "Displays your total balance when you hover the tray icon"}
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={!!settings.showMenuBarBalance}
+                  onChange={(e) => updateSettings({ showMenuBarBalance: e.target.checked })}
+                  style={{ display: "none" }}
+                />
+                <span className={`rollover-toggle__switch ${settings.showMenuBarBalance ? "rollover-toggle__switch--on" : ""}`} />
+              </label>
+            </div>
           </div>
         </GlassCard>
 
@@ -272,6 +749,8 @@ export default function Settings({ data }: Props) {
           </div>
         </GlassCard>
 
+        <AISettingsSection data={data} aiData={aiData} />
+
         {/* Data folder */}
         <GlassCard className="card-appear">
           <h2 className="section-title">Data Storage</h2>
@@ -303,6 +782,8 @@ export default function Settings({ data }: Props) {
             </div>
           </div>
         </GlassCard>
+
+        <SecuritySettingsSection />
 
         {/* Import / Export */}
         <GlassCard className="card-appear">

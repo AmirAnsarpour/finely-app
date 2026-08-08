@@ -1,3 +1,47 @@
+/* ── AI Markdown renderer ──────────────────────────────────── */
+.ai-md { font-size: 13.5px; line-height: 1.8; color: var(--text-secondary); }
+.ai-md--rtl { text-align: right; }
+.ai-md-h2 { font-size: 15px; font-weight: 700; color: var(--text-primary); margin: 18px 0 8px; }
+.ai-md-h2:first-child { margin-top: 0; }
+.ai-md-p { margin: 0 0 10px; }
+.ai-md-ul { margin: 0 0 10px; padding-inline-start: 20px; display: flex; flex-direction: column; gap: 4px; }
+.ai-md strong { color: var(--text-primary); font-weight: 600; }
+
+/* ── AI Insights tabs + chat ───────────────────────────────── */
+.ai-tabs {
+  display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 16px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+}
+.ai-tab {
+  padding: 7px 16px; border-radius: var(--radius-sm);
+  background: transparent; border: 1px solid transparent;
+  color: var(--text-secondary); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all var(--transition);
+}
+.ai-tab:hover { color: var(--text-primary); }
+.ai-tab--active, .ai-tab--active:hover { background: var(--accent-dim); color: var(--accent); border-color: rgba(108,142,245,0.3); }
+
+.ai-chat {
+  display: flex; flex-direction: column; height: 560px; max-height: 70vh;
+  border: 1px solid var(--glass-border); border-radius: var(--radius-lg);
+  background: var(--glass-bg); overflow: hidden;
+}
+.ai-chat__messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.ai-chat__msg { max-width: 82%; padding: 10px 13px; border-radius: var(--radius-md); font-size: 13.5px; line-height: 1.6; }
+.ai-chat__msg--user {
+  align-self: flex-end; background: var(--accent-dim); color: var(--text-primary);
+  border-bottom-right-radius: 4px;
+}
+.ai-chat__msg--user p { margin: 0; white-space: pre-wrap; }
+.ai-chat__msg--assistant {
+  align-self: flex-start; background: var(--glass-bg-hover); border-bottom-left-radius: 4px;
+}
+.ai-chat__msg--assistant .ai-md { color: var(--text-primary); }
+.ai-chat__typing { color: var(--text-muted); font-size: 13px; font-style: italic; }
+.ai-chat__input-row { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--glass-border); flex-shrink: 0; }
+.ai-chat__input-row .form-input { flex: 1; }
+
 /* ── GlassCard ─────────────────────────────────────────────── */
 .glass-card {
   background: var(--glass-bg);
@@ -97,6 +141,32 @@
   padding: 20px 24px 24px;
 }
 
+/* ── Quick Add (tray popup) ───────────────────────────────────── */
+.quickadd {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(8, 8, 10, 0.97);
+}
+[data-theme='light'] .quickadd {
+  background: rgba(245, 248, 255, 0.96);
+}
+.quickadd__header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--glass-border);
+  -webkit-app-region: drag; flex-shrink: 0;
+}
+.quickadd__header--mac { padding-left: 78px; }
+.quickadd__title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+}
+.quickadd__logo { width: 18px; height: 18px; object-fit: contain; border-radius: 4px; }
+.quickadd__header .winbtn { -webkit-app-region: no-drag; }
+.quickadd__body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; }
+.quickadd__loading { display: flex; align-items: center; justify-content: center; height: 100%; }
+
 /* ── Toast ─────────────────────────────────────────────────── */
 .toast-container {
   position: fixed;
@@ -158,6 +228,9 @@
   padding: 14px 14px 10px;
   -webkit-app-region: drag; flex-shrink: 0;
 }
+/* Leaves room for macOS's native traffic-light window controls, which sit
+   at the top-left over this titlebar (see trafficLightPosition in main/index.ts). */
+.sidebar__titlebar--mac { padding-left: 78px; }
 .sidebar__logo { display: flex; align-items: center; gap: 8px; }
 .sidebar__logo-img { width: 26px; height: 26px; object-fit: contain; border-radius: 6px; flex-shrink: 0; }
 .sidebar__app-name {
@@ -169,16 +242,18 @@
   background: rgba(255,255,255,0.92);
   -webkit-background-clip: text; background-clip: text;
 }
-.sidebar__winbtns { display: flex; gap: 5px; -webkit-app-region: no-drag; }
+.sidebar__winbtns { display: flex; gap: 2px; -webkit-app-region: no-drag; }
+/* Flat, minimal Windows-style caption buttons — a wide neutral hover zone for
+   minimize/maximize, and a solid red hover for close, matching the modern
+   Windows 11 titlebar convention (no borders, no circles). */
 .winbtn {
-  width: 20px; height: 20px; border-radius: 50%;
+  width: 30px; height: 22px; border-radius: 6px;
   display: flex; align-items: center; justify-content: center;
-  border: 1px solid var(--glass-border); background: var(--glass-bg);
-  color: var(--text-muted); transition: all var(--transition); flex-shrink: 0;
+  border: none; background: transparent;
+  color: var(--text-secondary); transition: all var(--transition); flex-shrink: 0;
 }
-.winbtn--minimize:hover { background: var(--warning-dim); color: var(--warning); border-color: rgba(251,191,36,0.4); }
-.winbtn--maximize:hover { background: var(--income-dim);  color: var(--income);  border-color: rgba(74,222,128,0.4);  }
-.winbtn--close:hover    { background: var(--expense-dim); color: var(--expense); border-color: rgba(248,113,113,0.4); }
+.winbtn--minimize:hover, .winbtn--maximize:hover { background: var(--glass-bg-hover); color: var(--text-primary); }
+.winbtn--close:hover { background: #e81123; color: #fff; }
 
 .sidebar__cta-wrap { padding: 4px 12px 8px; }
 .sidebar__cta {

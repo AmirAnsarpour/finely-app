@@ -2,7 +2,7 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, ArrowLeftRight, Tag,
-  BarChart3, Settings, Minus, Square, X, Plus, CreditCard, Target, TrendingUp, Wallet
+  BarChart3, Settings, Minus, Square, X, Plus, CreditCard, Target, TrendingUp, Wallet, Sparkles
 } from 'lucide-react'
 import logoUrl from '../assets/finely.png'
 
@@ -27,6 +27,7 @@ const NAV_GROUPS = [
     label: 'Insights',
     items: [
       { to: '/reports', icon: BarChart3, label: 'Reports' },
+      { to: '/ai-insights', icon: Sparkles, label: 'AI Insights' },
     ],
   },
   {
@@ -46,25 +47,32 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ onOpenAdd, budgetAlertCount = 0, installmentAlertCount = 0 }: SidebarProps) {
+  // On macOS the window uses native traffic-light controls (see main/index.ts),
+  // so the custom caption buttons only render on Windows/Linux, and the
+  // titlebar reserves space on the left instead for the native buttons.
+  const isMac = window.electronAPI.platform === 'darwin'
+
   return (
     <aside className="sidebar glass">
       {/* Title bar / drag region */}
-      <div className="sidebar__titlebar">
+      <div className={`sidebar__titlebar ${isMac ? 'sidebar__titlebar--mac' : ''}`}>
         <div className="sidebar__logo">
           <img src={logoUrl} alt="Finely" className="sidebar__logo-img" />
           <span className="sidebar__app-name">Finely</span>
         </div>
-        <div className="sidebar__winbtns">
-          <button className="winbtn winbtn--minimize" onClick={() => window.electronAPI.windowMinimize()} title="Minimize">
-            <Minus size={10} strokeWidth={3} />
-          </button>
-          <button className="winbtn winbtn--maximize" onClick={() => window.electronAPI.windowMaximize()} title="Maximize">
-            <Square size={9} strokeWidth={3} />
-          </button>
-          <button className="winbtn winbtn--close" onClick={() => window.electronAPI.windowClose()} title="Close">
-            <X size={10} strokeWidth={3} />
-          </button>
-        </div>
+        {!isMac && (
+          <div className="sidebar__winbtns">
+            <button className="winbtn winbtn--minimize" onClick={() => window.electronAPI.windowMinimize()} title="Minimize">
+              <Minus size={10} strokeWidth={3} />
+            </button>
+            <button className="winbtn winbtn--maximize" onClick={() => window.electronAPI.windowMaximize()} title="Maximize">
+              <Square size={9} strokeWidth={3} />
+            </button>
+            <button className="winbtn winbtn--close" onClick={() => window.electronAPI.windowClose()} title="Close">
+              <X size={10} strokeWidth={3} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* CTA */}

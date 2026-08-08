@@ -1,4 +1,4 @@
-import type { Account, Transaction, Category, AppSettings, Installment, Goal, Investment } from '../types'
+import type { Account, Transaction, Category, AppSettings, Installment, Goal, Investment, AIProvider, SpendingAnalysis, AIUsageEntry, AIChatMessage, VaultStatus, OsUnlockResult } from '../types'
 
 export const fileManager = {
   async readTransactions(): Promise<Transaction[]> {
@@ -40,8 +40,8 @@ export const fileManager = {
     return window.electronAPI.selectFolder()
   },
 
-  async exportCSV(transactions: Transaction[], categories: Category[], currencySymbol: string): Promise<boolean> {
-    return window.electronAPI.exportCSV({ transactions, categories, currencySymbol })
+  async exportCSV(transactions: Transaction[], categories: Category[], accounts: Account[], currencySymbol: string): Promise<boolean> {
+    return window.electronAPI.exportCSV({ transactions, categories, accounts, currencySymbol })
   },
 
   async exportZip(): Promise<boolean> {
@@ -90,5 +90,106 @@ export const fileManager = {
 
   async showNotification(title: string, body: string): Promise<void> {
     await window.electronAPI.showNotification({ title, body })
+  },
+
+  async readAnalyses(): Promise<SpendingAnalysis[]> {
+    const data = await window.electronAPI.readData('analyses')
+    return Array.isArray(data) ? data : []
+  },
+
+  async writeAnalyses(data: SpendingAnalysis[]): Promise<void> {
+    await window.electronAPI.writeData('analyses', data)
+  },
+
+  async aiHasKey(): Promise<boolean> {
+    return window.electronAPI.aiHasKey()
+  },
+
+  async aiSaveKey(key: string): Promise<void> {
+    await window.electronAPI.aiSaveKey(key)
+  },
+
+  async aiClearKey(): Promise<void> {
+    await window.electronAPI.aiClearKey()
+  },
+
+  async listAIModels(provider: AIProvider, baseUrl: string | undefined, apiKey: string | undefined): Promise<string[]> {
+    return window.electronAPI.aiListModels({ provider, baseUrl, apiKey })
+  },
+
+  async runAIAnalysis(provider: AIProvider, model: string, baseUrl: string | undefined, systemPrompt: string, userPrompt: string) {
+    return window.electronAPI.aiRunAnalysis({ provider, model, baseUrl, systemPrompt, userPrompt })
+  },
+
+  async streamAIChat(
+    provider: AIProvider,
+    model: string,
+    baseUrl: string | undefined,
+    systemPrompt: string,
+    messages: { role: 'user' | 'assistant'; content: string }[]
+  ) {
+    return window.electronAPI.aiChatStream({ provider, model, baseUrl, systemPrompt, messages })
+  },
+
+  onAIChatChunk(cb: (chunk: string) => void): () => void {
+    return window.electronAPI.onAIChatChunk(cb)
+  },
+
+  async readAIUsage(): Promise<AIUsageEntry[]> {
+    const data = await window.electronAPI.readData('aiUsage')
+    return Array.isArray(data) ? data : []
+  },
+
+  async writeAIUsage(data: AIUsageEntry[]): Promise<void> {
+    await window.electronAPI.writeData('aiUsage', data)
+  },
+
+  async readAIChatMessages(): Promise<AIChatMessage[]> {
+    const data = await window.electronAPI.readData('aiChat')
+    return Array.isArray(data) ? data : []
+  },
+
+  async writeAIChatMessages(data: AIChatMessage[]): Promise<void> {
+    await window.electronAPI.writeData('aiChat', data)
+  },
+
+  async vaultStatus(): Promise<VaultStatus> {
+    return window.electronAPI.vaultStatus()
+  },
+
+  async vaultUnlock(passphrase: string): Promise<boolean> {
+    return window.electronAPI.vaultUnlock(passphrase)
+  },
+
+  async vaultEnable(passphrase: string): Promise<boolean> {
+    return window.electronAPI.vaultEnable(passphrase)
+  },
+
+  async vaultDisable(): Promise<boolean> {
+    return window.electronAPI.vaultDisable()
+  },
+
+  async vaultChangePassphrase(passphrase: string): Promise<boolean> {
+    return window.electronAPI.vaultChangePassphrase(passphrase)
+  },
+
+  async vaultTryOsUnlock(): Promise<OsUnlockResult> {
+    return window.electronAPI.vaultTryOsUnlock()
+  },
+
+  async vaultEnableOsUnlock(): Promise<boolean> {
+    return window.electronAPI.vaultEnableOsUnlock()
+  },
+
+  async vaultDisableOsUnlock(): Promise<boolean> {
+    return window.electronAPI.vaultDisableOsUnlock()
+  },
+
+  async vaultLock(): Promise<boolean> {
+    return window.electronAPI.vaultLock()
+  },
+
+  setTrayBalance(text: string): void {
+    window.electronAPI.setTrayBalance(text)
   }
 }

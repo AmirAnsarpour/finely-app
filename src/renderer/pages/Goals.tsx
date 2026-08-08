@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react'
-import { Plus, Pencil, Trash2, Target, CheckCircle2, Calendar, ChevronDown, ChevronUp } from 'lucide-react'
+import React, { useState, useEffect, useMemo } from 'react'
+import { Plus, Pencil, Trash2, Target, CheckCircle2, Calendar, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
 import GlassCard from '../components/GlassCard'
 import Modal from '../components/Modal'
+import MarkdownView from '../components/MarkdownView'
 import DatePicker from '../components/DatePicker'
 import ColorPicker, { DEFAULT_COLOR_PRESETS } from '../components/ColorPicker'
 import CategoryIcon, { AVAILABLE_ICONS } from '../components/CategoryIcon'
@@ -11,6 +12,8 @@ import { useToast } from '../components/Toast'
 import { useCalendar } from '../utils/calendarContext'
 import { normalizeDigits } from '../utils/numerals'
 import { generateId, todayString } from '../utils/formatters'
+import { fileManager } from '../utils/fileManager'
+import { askAI, languageInstruction, MARKDOWN_FORMAT_INSTRUCTION } from '../utils/aiClient'
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -342,9 +345,9 @@ function GoalCard({
 // ── Main page ─────────────────────────────────────────────────
 
 export default function Goals({ data }: { data: UseDataReturn }) {
-  const { goals, addGoal, updateGoal, deleteGoal, logGoalContribution, settings } = data
+  const { goals, addGoal, updateGoal, deleteGoal, logGoalContribution, settings, transactions } = data
   const { toast } = useToast()
-  const { formatDate } = useCalendar()
+  const { formatDate, getLast6Months, getMonthKey, getMonthLabel } = useCalendar()
 
   const [showAdd, setShowAdd]               = useState(false)
   const [editGoal, setEditGoal]             = useState<Goal | null>(null)
@@ -353,6 +356,47 @@ export default function Goals({ data }: { data: UseDataReturn }) {
 
   const active    = goals.filter(g => g.currentAmount < g.targetAmount)
   const completed = goals.filter(g => g.currentAmount >= g.targetAmount)
+
+  // ── AI goal suggestion — self-contained, only needs settings + transactions ──
+  const [hasAIKey, setHasAIKey] = useState(false)
+  useEffect(() => { fileManager.aiHasKey().then(setHasAIKey) }, [])
+  const [suggestOpen, setSuggestOpen] = useState(false)
+  const [suggestContent, setSuggestContent] = useState<string | null>(null)
+  const [suggestLoading, setSuggestLoading] = useState(false)
+  const [suggestError, setSuggestError] = useState<string | null>(null)
+
+  const handleSuggestGoal = async () => {
+    setSuggestOpen(true)
+    setSuggestContent(null)
+    setSuggestError(null)
+    setSuggestLoading(true)
+    try {
+      const lines = [`Currency: ${settings.currencySymbol}`, 'Recent months (income, expenses, net surplus):']
+      getLast6Months().forEach(mk => {
+        const monthTxs = transactions.filter(t => t.type !== 'transfer' && getMonthKey(t.date) === mk)
+        const income = monthTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+        const expenses = monthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+        lines.push(`${getMonthLabel(mk)} (${mk}): income ${income.toFixed(2)}, expenses ${expenses.toFixed(2)}, net ${(income - expenses).toFixed(2)}`)
+      })
+      if (goals.length > 0) {
+        lines.push('', 'Existing goals:')
+        goals.forEach(g => lines.push(`- ${g.name}: ${g.currentAmount.toFixed(2)} / ${g.targetAmount.toFixed(2)}${g.deadline ? `, deadline ${g.deadline}` : ''}`))
+      }
+      const systemPrompt =
+        `You are a personal finance analyst. You receive someone's recent monthly income/expense/surplus trend, and ` +
+        `their existing savings goals if any. Suggest ONE new savings goal that fits their actual surplus: a name, a ` +
+        `realistic target amount, and a realistic deadline given their average monthly surplus — explain the reasoning ` +
+        `behind the numbers in 1-2 sentences. If their surplus is negative or near zero, say so plainly instead of ` +
+        `suggesting an unrealistic goal. ${languageInstruction(settings)}\n\n` +
+        MARKDOWN_FORMAT_INSTRUCTION
+      const content = await askAI(settings, 'goal-suggestion', systemPrompt, lines.join('\n'))
+      setSuggestContent(content)
+    } catch (err) {
+      setSuggestError(err instanceof Error ? err.message : 'Failed to get a suggestion')
+    } finally {
+      setSuggestLoading(false)
+    }
+  }
 
   const summary = useMemo(() => {
     const totalTarget  = goals.reduce((s, g) => s + g.targetAmount, 0)
@@ -410,9 +454,16 @@ export default function Goals({ data }: { data: UseDataReturn }) {
           <h1 className="page-title">Goals</h1>
           <p className="page-sub">Track your savings goals and milestones</p>
         </div>
-        <button className="btn-add" onClick={() => setShowAdd(true)}>
-          <Plus size={14} /> New Goal
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {hasAIKey && (
+            <button className="btn-secondary" onClick={handleSuggestGoal}>
+              <Sparkles size={14} /> Suggest a Goal
+            </button>
+          )}
+          <button className="btn-add" onClick={() => setShowAdd(true)}>
+            <Plus size={14} /> New Goal
+          </button>
+        </div>
       </div>
 
       {goals.length === 0 ? (
@@ -514,6 +565,17 @@ export default function Goals({ data }: { data: UseDataReturn }) {
           <button className="btn-ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
           <button className="btn-danger" onClick={handleDelete}>Delete</button>
         </div>
+      </Modal>
+
+      {/* AI goal suggestion */}
+      <Modal open={suggestOpen} onClose={() => setSuggestOpen(false)} title="AI Goal Suggestion" width={440}>
+        {suggestLoading && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
+            <div className="spinner" />
+          </div>
+        )}
+        {suggestError && <p className="form-error">{suggestError}</p>}
+        {suggestContent && <MarkdownView content={suggestContent} />}
       </Modal>
     </div>
   )

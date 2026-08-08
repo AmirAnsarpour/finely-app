@@ -15,7 +15,9 @@ interface Props {
 }
 
 export default function InlineEditRow({ transaction, categories, accounts, settings, onSave, onCancel }: Props) {
-  const [type, setType]           = useState<'income' | 'expense'>(transaction.type)
+  // Transfers are routed to the full TransactionForm modal (they need From/To
+  // account fields), so this row only ever mounts for income/expense.
+  const [type, setType]           = useState<'income' | 'expense'>(transaction.type === 'income' ? 'income' : 'expense')
   const [category, setCategory]   = useState(transaction.category)
   const [accountId, setAccountId] = useState(transaction.accountId ?? '')
   const [amount, setAmount]       = useState(String(transaction.amount))

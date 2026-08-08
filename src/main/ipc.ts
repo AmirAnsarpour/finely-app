@@ -1,5 +1,9 @@
 import { ipcMain, dialog, app, BrowserWindow, shell, Notification } from 'electron'
 import { checkForUpdate, downloadUpdate, applyUpdateAndRestart } from './updater'
+import { hasApiKey, saveApiKey, clearApiKey, runAIAnalysis, listAvailableModels, streamAIChat } from './ai'
+import type { RunAnalysisParams, ListModelsParams, ChatParams } from './ai'
+import * as vault from './vault'
+import { setTrayTitle } from './tray'
 import { join } from 'path'
 import fs from 'fs'
 import path from 'path'
@@ -51,7 +55,10 @@ const FILE_MAP: Record<string, string> = {
   installments: 'installments.json',
   goals: 'goals.json',
   investments: 'investments.json',
-  accounts: 'accounts.json'
+  accounts: 'accounts.json',
+  analyses: 'analyses.json',
+  aiUsage: 'ai-usage.json',
+  aiChat: 'ai-chat.json'
 }
 
 function ensureDataFolder(): void {
@@ -70,8 +77,12 @@ export function registerIpcHandlers(): void {
     ensureDataFolder()
     const fp = filePath(file)
     if (!fs.existsSync(fp)) return null
+    const raw = fs.readFileSync(fp, 'utf-8')
+    // Throws (rather than falling back to null) if the vault is locked, so
+    // a locked read never gets mistaken for "no data yet" upstream.
+    const plain = vault.decryptForRead(config.dataFolder, raw)
     try {
-      return JSON.parse(fs.readFileSync(fp, 'utf-8'))
+      return JSON.parse(plain)
     } catch {
       return null
     }
@@ -82,7 +93,63 @@ export function registerIpcHandlers(): void {
     if (typeof data !== 'object') throw new Error(`write-data: payload for "${file}" must be an object or array`)
     ensureDataFolder()
     const fp = filePath(file)
-    await queueWrite(fp, () => fs.writeFileSync(fp, JSON.stringify(data, null, 2), 'utf-8'))
+    const json = JSON.stringify(data, null, 2)
+    const payload = vault.vaultExists(config.dataFolder) ? vault.encryptForWrite(config.dataFolder, json) : json
+    await queueWrite(fp, () => fs.writeFileSync(fp, payload, 'utf-8'))
+    return true
+  })
+
+  ipcMain.handle('vault-status', async () => {
+    ensureDataFolder()
+    return {
+      exists: vault.vaultExists(config.dataFolder),
+      unlocked: vault.isUnlocked(config.dataFolder),
+      osUnlockAvailable: vault.osUnlockAvailable(),
+      osUnlockEnabled: vault.osUnlockEnabled(),
+    }
+  })
+
+  ipcMain.handle('vault-try-os-unlock', async () => {
+    ensureDataFolder()
+    return vault.tryOsUnlock(config.dataFolder)
+  })
+
+  ipcMain.handle('vault-enable-os-unlock', async () => {
+    ensureDataFolder()
+    await vault.enableOsUnlock(config.dataFolder)
+    return true
+  })
+
+  ipcMain.handle('vault-disable-os-unlock', async () => {
+    vault.disableOsUnlock()
+    return true
+  })
+
+  ipcMain.handle('vault-unlock', async (_event, passphrase: string) => {
+    ensureDataFolder()
+    return vault.unlock(config.dataFolder, passphrase)
+  })
+
+  ipcMain.handle('vault-enable', async (_event, passphrase: string) => {
+    ensureDataFolder()
+    vault.enable(config.dataFolder, passphrase, Object.values(FILE_MAP))
+    return true
+  })
+
+  ipcMain.handle('vault-disable', async () => {
+    ensureDataFolder()
+    vault.disable(config.dataFolder, Object.values(FILE_MAP))
+    return true
+  })
+
+  ipcMain.handle('vault-change-passphrase', async (_event, passphrase: string) => {
+    ensureDataFolder()
+    vault.changePassphrase(config.dataFolder, passphrase, Object.values(FILE_MAP))
+    return true
+  })
+
+  ipcMain.handle('vault-lock', async () => {
+    vault.lock()
     return true
   })
 
@@ -105,7 +172,7 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('export-csv', async (
     _event,
-    { transactions, categories, currencySymbol }: { transactions: Array<Record<string, unknown>>; categories: Array<Record<string, unknown>>; currencySymbol: string }
+    { transactions, categories, accounts, currencySymbol }: { transactions: Array<Record<string, unknown>>; categories: Array<Record<string, unknown>>; accounts: Array<Record<string, unknown>>; currencySymbol: string }
   ) => {
     const result = await dialog.showSaveDialog({
       defaultPath: 'finely-transactions.csv',
@@ -115,9 +182,19 @@ export function registerIpcHandlers(): void {
 
     const header = 'Date,Type,Category,Amount,Note\n'
     const rows = transactions.map((t) => {
+      const amount = csvField(`${currencySymbol}${t['amount']}`)
+
+      if (t['type'] === 'transfer') {
+        const from = accounts.find((a) => a['id'] === t['accountId']) as Record<string, unknown> | undefined
+        const to = accounts.find((a) => a['id'] === t['toAccountId']) as Record<string, unknown> | undefined
+        const catName = csvField('Transfer')
+        const routeNote = `${from ? String(from['name']) : 'Unknown'} → ${to ? String(to['name']) : 'Unknown'}${t['note'] ? ' — ' + String(t['note']) : ''}`
+        const note = csvField(routeNote)
+        return `${t['date']},${t['type']},${catName},${amount},${note}`
+      }
+
       const cat = categories.find((c) => c['id'] === t['category']) as Record<string, unknown> | undefined
       const catName = csvField(cat ? String(cat['name']) : String(t['category']))
-      const amount = csvField(`${currencySymbol}${t['amount']}`)
       const note = csvField(String(t['note'] ?? ''))
       return `${t['date']},${t['type']},${catName},${amount},${note}`
     }).join('\n')
@@ -187,6 +264,26 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('ai-has-key', () => hasApiKey())
+
+  ipcMain.handle('ai-save-key', (_event, key: string) => {
+    saveApiKey(key)
+    return true
+  })
+
+  ipcMain.handle('ai-clear-key', () => {
+    clearApiKey()
+    return true
+  })
+
+  ipcMain.handle('ai-run-analysis', (_event, params: RunAnalysisParams) => runAIAnalysis(params))
+
+  ipcMain.handle('ai-list-models', (_event, params: ListModelsParams) => listAvailableModels(params))
+
+  ipcMain.handle('ai-chat-stream', (event, params: ChatParams) =>
+    streamAIChat(params, (chunk) => event.sender.send('ai-chat-chunk', chunk))
+  )
+
   ipcMain.handle('get-app-version', () => app.getVersion())
 
   ipcMain.handle('update-check', () => checkForUpdate())
@@ -210,4 +307,6 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.on('window-close', () => BrowserWindow.getFocusedWindow()?.close())
+
+  ipcMain.on('tray-set-balance', (_event, text: string) => setTrayTitle(text))
 }

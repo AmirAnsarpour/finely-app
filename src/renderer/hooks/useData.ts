@@ -28,8 +28,8 @@ export function useData() {
   }, [tx.loadData, cat.loadData, sett.loadData, inst.loadData, goal.loadData, inv.loadData, acc.loadData])
 
   const exportCSV = useCallback(async () =>
-    fileManager.exportCSV(tx.transactions, cat.categories, sett.settings.currencySymbol),
-    [tx.transactions, cat.categories, sett.settings.currencySymbol])
+    fileManager.exportCSV(tx.transactions, cat.categories, acc.accounts, sett.settings.currencySymbol),
+    [tx.transactions, cat.categories, acc.accounts, sett.settings.currencySymbol])
 
   const exportZip = useCallback(async () => fileManager.exportZip(), [])
 

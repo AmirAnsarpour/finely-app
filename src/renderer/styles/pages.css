@@ -265,6 +265,29 @@
 .form-label--opt { font-weight: 400; text-transform: none; letter-spacing: 0; }
 .form-input { user-select: text; font-size: 14px; }
 
+.tx-nl { display: flex; flex-direction: column; gap: 6px; }
+.tx-nl__field {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-radius: var(--radius-sm);
+  background: var(--accent-dim); border: 1px solid transparent;
+  transition: border-color var(--transition);
+}
+.tx-nl__field:focus-within { border-color: var(--accent); }
+.tx-nl__icon { color: var(--accent); flex-shrink: 0; }
+.tx-nl__input {
+  flex: 1; min-width: 0; background: transparent; border: none; outline: none;
+  font-size: 13px; color: var(--text-primary);
+}
+.tx-nl__input::placeholder { color: var(--text-muted); }
+.tx-nl__btn {
+  flex-shrink: 0; font-size: 11px; font-weight: 600; padding: 4px 10px;
+  border-radius: var(--radius-xs); border: 1px solid var(--accent);
+  background: transparent; color: var(--accent); cursor: pointer;
+  transition: background var(--transition);
+}
+.tx-nl__btn:hover:not(:disabled) { background: rgba(108,142,245,0.15); }
+.tx-nl__btn:disabled { opacity: 0.5; cursor: default; }
+
 .tx-suggestion {
   display: flex; align-items: center; gap: 6px;
   padding: 7px 11px; border-radius: var(--radius-sm);

@@ -9,12 +9,13 @@ export interface Account {
 export interface Transaction {
   id: string
   amount: number
-  type: 'income' | 'expense'
-  category: string
+  type: 'income' | 'expense' | 'transfer'
+  category: string          // empty string for transfers
   date: string
   note: string
   tags?: string[]
-  accountId?: string
+  accountId?: string        // transfers: source account
+  toAccountId?: string      // transfers: destination account
   createdAt: string
 }
 
@@ -38,6 +39,81 @@ export interface AppSettings {
   calendarType?: 'gregorian' | 'jalali'
   weekStartDay?: 0 | 1 | 6   // 0=Sun, 1=Mon, 6=Sat
   investmentCurrency: 'IRT' | 'USDT'
+  aiProvider?: AIProvider
+  aiModel?: string
+  aiBaseUrl?: string         // only used when aiProvider === 'custom'
+  aiAutoMonthly?: boolean
+  aiResponseLanguage?: AIResponseLanguage
+  showMenuBarBalance?: boolean   // macOS only — shows total balance next to the tray icon
+}
+
+export interface VaultStatus {
+  exists: boolean            // whether this data folder has encryption set up
+  unlocked: boolean          // whether the passphrase has already been entered this session
+  osUnlockAvailable: boolean // whether this device's OS-level secure storage can be used at all
+  osUnlockEnabled: boolean   // whether the user opted into skipping the passphrase via the OS
+}
+
+export interface OsUnlockResult {
+  ok: boolean
+  reason?: string // underlying error (e.g. a Touch ID/LocalAuthentication message), for diagnosing failures
+}
+
+// 'auto' asks the model to match the language of the data it's given
+// (category names, etc.) — the other values force a specific language
+// regardless of what the data looks like.
+export type AIResponseLanguage = 'auto' | 'fa' | 'en'
+
+// AI spending analysis — bring-your-own API key, any provider. The key
+// itself never lives in settings.json; it's stored separately (OS-encrypted)
+// so the plain-JSON data folder never holds a credential.
+export type AIProvider = 'openai' | 'anthropic' | 'google' | 'custom'
+
+export interface AIUsage {
+  inputTokens?: number
+  outputTokens?: number
+}
+
+export interface AICallResult {
+  text: string
+  usage?: AIUsage
+}
+
+export interface AIChatStreamParams {
+  provider: AIProvider
+  model: string
+  baseUrl?: string
+  systemPrompt: string
+  messages: { role: 'user' | 'assistant'; content: string }[]
+}
+
+export interface SpendingAnalysis {
+  id: string
+  createdAt: string   // ISO timestamp this analysis was generated
+  monthKey: string    // the month (in the app's current calendar) it covers
+  content: string      // the model's response, plain text
+  provider: AIProvider
+  model: string
+}
+
+// One entry per completed AI call, purely informational (token counts only —
+// no dollar estimate, since per-model pricing isn't something we can keep
+// current across every provider without going stale).
+export interface AIUsageEntry {
+  id: string
+  createdAt: string
+  provider: AIProvider
+  model: string
+  purpose: string
+  inputTokens?: number
+  outputTokens?: number
+}
+
+export interface AIChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  createdAt: string
 }
 
 export interface InstallmentPayment {

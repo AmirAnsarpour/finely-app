@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__codebase-memory-mcp__index_status",
+      "mcp__codebase-memory-mcp__get_architecture",
+      "Bash(sips -z 22 22 finely.png --out trayIcon.png)",
+      "Bash(sips -z 44 44 finely.png --out trayIcon@2x.png)",
+      "Bash(sips -z 32 32 finely.png --out trayIconWin.png)",
+      "Bash(sips -z 1024 1024 finely.png --out macIcon.png)",
+      "Bash(sips -g pixelWidth -g pixelHeight macIcon.png)",
+      "Bash(bunx tsc *)",
+      "Bash(pkill -f electron-vite)",
+      "Bash(pkill -f \"out/main/index.js\")",
+      "Bash(git -C /Users/amir/Main/github/finely-app status --short)",
+      "Bash(git -C /Users/amir/Main/github/finely-app diff --stat src/preload/index.ts src/renderer/hooks/useData.ts)",
+      "Bash(git -C /Users/amir/Main/github/finely-app diff src/renderer/hooks/useData.ts)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Bash(bun add *)",
+      "Bash(bun remove *)",
+      "Bash(grep -n \"export default function Reports\\\\|MonthNav$\\\\|{/\\\\* ── KPI cards\" /Users/amir/Main/github/finely-app/src/renderer/pages/Reports.tsx)",
+      "Bash(node -e ' *)",
+      "Bash(grep -n \"page-header\\\\|Categories</h1>\\\\|</Modal>$\" /Users/amir/Main/github/finely-app/src/renderer/pages/Categories.tsx)",
+      "Bash(python3 -c \"import PIL; print\\('Pillow', PIL.__version__\\)\")",
+      "Bash(python3 -c \"import cairosvg; print\\('cairosvg ok'\\)\")",
+      "Bash(python3 -c \"import numpy; print\\('numpy ok'\\)\")",
+      "Bash(node -e \"console.log\\(require\\('sharp'\\)\\)\")",
+      "Bash(node -e \"console.log\\(require\\('canvas'\\)\\)\")",
+      "Bash(python3 -c ' *)"
+    ]
+  }
+}

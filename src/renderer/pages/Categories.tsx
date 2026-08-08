@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react'
-import { Plus, Pencil, Trash2, Tag, GripVertical } from 'lucide-react'
+import React, { useState, useRef, useEffect } from 'react'
+import { Plus, Pencil, Trash2, Tag, GripVertical, Sparkles } from 'lucide-react'
 import GlassCard from '../components/GlassCard'
 import CategoryIcon, { AVAILABLE_ICONS } from '../components/CategoryIcon'
 import Modal from '../components/Modal'
@@ -9,6 +9,9 @@ import { formatCurrency } from '../utils/formatters'
 import type { Category } from '../types'
 import type { UseDataReturn } from '../hooks/useData'
 import { useToast } from '../components/Toast'
+import { useCalendar } from '../utils/calendarContext'
+import { fileManager } from '../utils/fileManager'
+import { askAI, languageInstruction } from '../utils/aiClient'
 
 interface Props { data: UseDataReturn }
 
@@ -127,6 +130,97 @@ function CategoryForm({
         </button>
       </div>
     </form>
+  )
+}
+
+// ── AI budget suggestion ─────────────────────────────────────
+
+interface BudgetSuggestionRow {
+  categoryId: string
+  categoryName: string
+  currentBudget?: number
+  suggested: number
+  reason: string
+}
+
+// The AI is asked for a strict "Name|Amount|Reason" line format (not the
+// shared Markdown subset — this response is parsed, not rendered), so
+// unmatched or malformed lines are just skipped rather than shown broken.
+function parseBudgetSuggestions(raw: string, expenseCategories: Category[]): BudgetSuggestionRow[] {
+  const rows: BudgetSuggestionRow[] = []
+  raw.split('\n').forEach(line => {
+    const parts = line.split('|').map(p => p.trim())
+    if (parts.length !== 3) return
+    const [name, amountStr, reason] = parts
+    const amount = parseFloat(amountStr.replace(/[^0-9.]/g, ''))
+    if (!name || isNaN(amount) || amount <= 0) return
+    const cat = expenseCategories.find(c => c.name.trim().toLowerCase() === name.toLowerCase())
+    if (!cat) return
+    rows.push({ categoryId: cat.id, categoryName: cat.name, currentBudget: cat.budget, suggested: Math.round(amount), reason })
+  })
+  return rows
+}
+
+function BudgetSuggestionModal({
+  open, onClose, rows, fmt, onApply, applying,
+}: {
+  open: boolean
+  onClose: () => void
+  rows: BudgetSuggestionRow[]
+  fmt: (n: number) => string
+  onApply: (selectedIds: string[]) => Promise<void>
+  applying: boolean
+}) {
+  const [checked, setChecked] = useState<Set<string>>(new Set())
+
+  // Reset selection to "all checked" whenever a fresh batch of rows arrives.
+  useEffect(() => { setChecked(new Set(rows.map(r => r.categoryId))) }, [rows])
+
+  const toggle = (id: string) => setChecked(prev => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+
+  return (
+    <Modal open={open} onClose={onClose} title="AI Budget Suggestions" width={520}>
+      {rows.length === 0 ? (
+        <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>No suggestions could be matched to your categories.</p>
+      ) : (
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 360, overflowY: 'auto' }}>
+            {rows.map(row => (
+              <label key={row.categoryId} className="rollover-toggle" style={{ cursor: 'pointer' }}>
+                <span className="rollover-toggle__text">
+                  <span className="form-label" style={{ margin: 0 }}>
+                    {row.categoryName} — {row.currentBudget ? `${fmt(row.currentBudget)} → ` : ''}{fmt(row.suggested)}
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>{row.reason}</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={checked.has(row.categoryId)}
+                  onChange={() => toggle(row.categoryId)}
+                  style={{ display: 'none' }}
+                />
+                <span className={`rollover-toggle__switch ${checked.has(row.categoryId) ? 'rollover-toggle__switch--on' : ''}`} />
+              </label>
+            ))}
+          </div>
+          <div className="form-actions" style={{ marginTop: 16 }}>
+            <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={applying || checked.size === 0}
+              onClick={() => onApply(Array.from(checked))}
+            >
+              {applying ? 'Applying…' : `Apply ${checked.size} Selected`}
+            </button>
+          </div>
+        </>
+      )}
+    </Modal>
   )
 }
 
@@ -268,8 +362,9 @@ function CategoryList({
 }
 
 export default function Categories({ data }: Props) {
-  const { categories, settings, addCategory, updateCategory, deleteCategory, reorderCategories } = data
+  const { categories, settings, transactions, addCategory, updateCategory, deleteCategory, reorderCategories } = data
   const { toast } = useToast()
+  const { getLast6Months, getMonthKey } = useCalendar()
 
   const [modalType, setModalType] = useState<'income' | 'expense'>('expense')
   const [showModal, setShowModal] = useState(false)
@@ -281,6 +376,62 @@ export default function Categories({ data }: Props) {
   const budgeted    = expense.filter(c => c.budget && c.budget > 0)
   const totalBudget = budgeted.reduce((s, c) => s + (c.budget ?? 0), 0)
   const fmt = (n: number) => formatCurrency(n, settings.currencySymbol, settings.currencyLocale)
+
+  // ── AI budget suggestions — self-contained, only needs settings + transactions ──
+  const [hasAIKey, setHasAIKey] = useState(false)
+  useEffect(() => { fileManager.aiHasKey().then(setHasAIKey) }, [])
+  const [suggestOpen, setSuggestOpen] = useState(false)
+  const [suggestLoading, setSuggestLoading] = useState(false)
+  const [suggestRows, setSuggestRows] = useState<BudgetSuggestionRow[]>([])
+  const [applyingBudgets, setApplyingBudgets] = useState(false)
+
+  const handleSuggestBudgets = async () => {
+    setSuggestLoading(true)
+    try {
+      const months = getLast6Months()
+      const lines = [
+        `Currency: ${settings.currencySymbol}`,
+        'Actual monthly spending per expense category over the last 6 months (oldest to newest):',
+      ]
+      expense.forEach(cat => {
+        const perMonth = months.map(mk =>
+          transactions.filter(t => t.type === 'expense' && t.category === cat.id && getMonthKey(t.date) === mk).reduce((s, t) => s + t.amount, 0)
+        )
+        const budgetNote = cat.budget ? ` (current budget: ${cat.budget})` : ' (no budget set)'
+        lines.push(`${cat.name}${budgetNote}: ${perMonth.map(v => v.toFixed(2)).join(', ')}`)
+      })
+      const systemPrompt =
+        `You are a personal finance analyst. You receive, for each expense category, its actual spending for each of ` +
+        `the last 6 months (oldest to newest) and its current budget if any. Suggest a realistic monthly budget for ` +
+        `EVERY category listed, based on the actual spending pattern — weight recent months more, allow some ` +
+        `headroom, and account for a clear trend rather than a blind average. Respond with EXACTLY one line per ` +
+        `category, nothing else — no headers, no blank lines, no extra commentary:\n` +
+        `CategoryName|SuggestedBudget|OneLineReason\n` +
+        `The category name must match exactly what was given. The reason is one short sentence. ${languageInstruction(settings)}`
+      const content = await askAI(settings, 'budget-suggestion', systemPrompt, lines.join('\n'))
+      setSuggestRows(parseBudgetSuggestions(content, expense))
+      setSuggestOpen(true)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to get budget suggestions', 'error')
+    } finally {
+      setSuggestLoading(false)
+    }
+  }
+
+  const handleApplyBudgets = async (selectedIds: string[]) => {
+    setApplyingBudgets(true)
+    try {
+      await Promise.all(
+        suggestRows
+          .filter(r => selectedIds.includes(r.categoryId))
+          .map(r => updateCategory(r.categoryId, { budget: r.suggested }))
+      )
+      toast(`Updated ${selectedIds.length} budget${selectedIds.length !== 1 ? 's' : ''}`)
+      setSuggestOpen(false)
+    } finally {
+      setApplyingBudgets(false)
+    }
+  }
 
   const handleAdd    = (t: 'income' | 'expense') => { setModalType(t); setEditCat(null); setShowModal(true) }
   const handleEdit   = (c: Category) => { setModalType(c.type); setEditCat(c); setShowModal(true) }
@@ -313,6 +464,12 @@ export default function Categories({ data }: Props) {
           <h1 className="page-title">Categories</h1>
           <p className="page-sub">Manage your income and expense categories</p>
         </div>
+        {hasAIKey && expense.length > 0 && (
+          <button className="btn-secondary" onClick={handleSuggestBudgets} disabled={suggestLoading}>
+            <Sparkles size={14} style={suggestLoading ? { animation: 'spin 1s linear infinite' } : undefined} />
+            {suggestLoading ? 'Thinking…' : 'AI Suggest Budgets'}
+          </button>
+        )}
       </div>
 
       {/* Overview strip */}
@@ -391,6 +548,15 @@ export default function Categories({ data }: Props) {
           <button className="btn-danger" onClick={confirmDeleteCat}>Delete</button>
         </div>
       </Modal>
+
+      <BudgetSuggestionModal
+        open={suggestOpen}
+        onClose={() => setSuggestOpen(false)}
+        rows={suggestRows}
+        fmt={fmt}
+        onApply={handleApplyBudgets}
+        applying={applyingBudgets}
+      />
     </div>
   )
 }

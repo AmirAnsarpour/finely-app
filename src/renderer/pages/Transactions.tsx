@@ -6,6 +6,7 @@ import TransactionItem from '../components/TransactionItem'
 import SkeletonRow from '../components/SkeletonRow'
 import InlineEditRow from '../components/InlineEditRow'
 import Modal from '../components/Modal'
+import TransactionForm from './TransactionForm'
 import type { Transaction } from '../types'
 import type { UseDataReturn } from '../hooks/useData'
 import { useToast } from '../components/Toast'
@@ -38,13 +39,14 @@ export default function Transactions({ data }: Props) {
   const { formatDate } = useCalendar()
 
   const [search, setSearch] = useSessionState('finely-tx-search', '')
-  const [typeFilter, setTypeFilter] = useSessionState<'all' | 'income' | 'expense'>('finely-tx-type', 'all')
+  const [typeFilter, setTypeFilter] = useSessionState<'all' | 'income' | 'expense' | 'transfer'>('finely-tx-type', 'all')
   const [categoryFilter, setCategoryFilter] = useSessionState('finely-tx-cat', '')
   const [dateFrom, setDateFrom] = useSessionState('finely-tx-from', '')
   const [dateTo, setDateTo] = useSessionState('finely-tx-to', '')
   const [tagFilter, setTagFilter] = useSessionState('finely-tx-tag', '')
 
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [editingTransfer, setEditingTransfer] = useState<Transaction | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [visibleCount, setVisibleCount] = useState(15)
   const [exporting, setExporting] = useState(false)
@@ -144,7 +146,7 @@ export default function Transactions({ data }: Props) {
               value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <div className="type-pills">
-            {(['all', 'income', 'expense'] as const).map(t => (
+            {(['all', 'income', 'expense', 'transfer'] as const).map(t => (
               <button key={t}
                 className={`pill ${typeFilter === t ? 'pill--active' : ''} ${t !== 'all' ? t : ''}`}
                 onClick={() => { setTypeFilter(t); setCategoryFilter('') }}>
@@ -239,7 +241,7 @@ export default function Transactions({ data }: Props) {
                       onSave={handleSave} onCancel={() => setExpandedId(null)} />
                   ) : (
                     <TransactionItem key={t.id} transaction={t} categories={categories} accounts={accounts} settings={settings}
-                      onEdit={() => setExpandedId(t.id)} onDelete={id => setConfirmDelete(id)}
+                      onEdit={tx => tx.type === 'transfer' ? setEditingTransfer(tx) : setExpandedId(tx.id)} onDelete={id => setConfirmDelete(id)}
                       animDelay={Math.min(i * 25, 200)} />
                   )
                 ))}
@@ -263,6 +265,25 @@ export default function Transactions({ data }: Props) {
           <button className="btn-ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
           <button className="btn-danger" onClick={confirmDeleteTx}>Delete</button>
         </div>
+      </Modal>
+
+      {/* Edit transfer — transfers need From/To account fields, so they use the full form instead of the inline row */}
+      <Modal open={!!editingTransfer} onClose={() => setEditingTransfer(null)} title="Edit Transfer">
+        {editingTransfer && (
+          <TransactionForm
+            categories={categories}
+            accounts={accounts}
+            settings={settings}
+            transactions={transactions}
+            initial={editingTransfer}
+            onSave={async (tx) => {
+              await updateTransaction(editingTransfer.id, tx)
+              toast('Transfer updated')
+              setEditingTransfer(null)
+            }}
+            onCancel={() => setEditingTransfer(null)}
+          />
+        )}
       </Modal>
 
     </div>

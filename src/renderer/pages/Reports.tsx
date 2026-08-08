@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react'
-import { Download, TrendingUp, TrendingDown, Wallet, PiggyBank, ArrowUpRight, ArrowDownRight, Minus, BarChart2, PieChart, Activity, Tag } from 'lucide-react'
+import { Download, TrendingUp, TrendingDown, Wallet, PiggyBank, ArrowUpRight, ArrowDownRight, Minus, BarChart2, PieChart, Activity, Tag, Sparkles } from 'lucide-react'
 import GlassCard from '../components/GlassCard'
+import Modal from '../components/Modal'
+import MarkdownView from '../components/MarkdownView'
 import { MonthlyBarChart, ExpensePieChart, DailySpendingChart } from '../components/Chart'
 import CategoryIcon from '../components/CategoryIcon'
 import type { UseDataReturn } from '../hooks/useData'
@@ -8,6 +10,8 @@ import { formatCurrency } from '../utils/formatters'
 import { useCalendar } from '../utils/calendarContext'
 import { useToast } from '../components/Toast'
 import { formatPriceValue } from '../utils/investmentPricing'
+import { fileManager } from '../utils/fileManager'
+import { askAI, languageInstruction, MARKDOWN_FORMAT_INSTRUCTION } from '../utils/aiClient'
 
 interface Props { data: UseDataReturn }
 
@@ -72,11 +76,46 @@ export default function Reports({ data }: Props) {
   const { toast } = useToast()
   const {
     calendarType, formatDateShort, getMonthLabel, formatMonthYear,
-    getMonthKey, currentMonthKey, getLast12Months, previousMonthKey,
+    getMonthKey, currentMonthKey, getLast12Months, getLast6Months, previousMonthKey,
     getDaysInMonth, dayISO,
   } = useCalendar()
 
   const months = useMemo(() => getLast12Months(), [calendarType])
+
+  // ── AI category drill-down — self-contained, no aiData prop needed ──
+  const [hasAIKey, setHasAIKey] = useState(false)
+  useEffect(() => { fileManager.aiHasKey().then(setHasAIKey) }, [])
+  const [drilldown, setDrilldown] = useState<{ id: string; name: string } | null>(null)
+  const [drilldownContent, setDrilldownContent] = useState<string | null>(null)
+  const [drilldownLoading, setDrilldownLoading] = useState(false)
+  const [drilldownError, setDrilldownError] = useState<string | null>(null)
+
+  const handleAskAboutCategory = async (categoryId: string, categoryName: string) => {
+    setDrilldown({ id: categoryId, name: categoryName })
+    setDrilldownContent(null)
+    setDrilldownError(null)
+    setDrilldownLoading(true)
+    try {
+      const lines = [`Currency: ${settings.currencySymbol}`, `Category: ${categoryName}`]
+      getLast6Months().forEach(mk => {
+        const amt = transactions
+          .filter(t => t.type === 'expense' && t.category === categoryId && getMonthKey(t.date) === mk)
+          .reduce((s, t) => s + t.amount, 0)
+        lines.push(`${getMonthLabel(mk)} (${mk}): ${amt.toFixed(2)}`)
+      })
+      const systemPrompt =
+        `You are a personal finance analyst. You receive one expense category's monthly totals over recent months — ` +
+        `no transaction-level detail. In 2-4 short sentences, explain why this category might be trending the way it ` +
+        `is and give one concrete, specific suggestion to manage it better. ${languageInstruction(settings)}\n\n` +
+        MARKDOWN_FORMAT_INSTRUCTION
+      const content = await askAI(settings, 'category-drilldown', systemPrompt, lines.join('\n'))
+      setDrilldownContent(content)
+    } catch (err) {
+      setDrilldownError(err instanceof Error ? err.message : 'Failed to get analysis')
+    } finally {
+      setDrilldownLoading(false)
+    }
+  }
   const [selectedMonth, setSelectedMonth] = useState(() => months[months.length - 1])
   const [selectedYear, setSelectedYear] = useState(() => parseInt(currentMonthKey().slice(0, 4)))
   const [tagScope, setTagScope] = useState<'month' | 'all'>('month')
@@ -334,6 +373,16 @@ export default function Reports({ data }: Props) {
                       <div className="top-cat-bar" style={{ width: `${item.percentage}%`, background: item.color }} />
                     </div>
                   </div>
+                  {hasAIKey && (
+                    <button
+                      className="icon-action"
+                      onClick={() => handleAskAboutCategory(item.categoryId, item.category)}
+                      title={`Ask AI about ${item.category}`}
+                      style={{ flexShrink: 0 }}
+                    >
+                      <Sparkles size={13} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -594,7 +643,7 @@ export default function Reports({ data }: Props) {
                             <span className="ta-tx-cat">{cat?.name ?? 'Unknown'}</span>
                             {t.note && <span className="ta-tx-note">{t.note}</span>}
                           </div>
-                          <span className={`ta-tx-amt ${t.type}`}>{t.type === 'income' ? '+' : '−'}{fmt(t.amount)}</span>
+                          <span className={`ta-tx-amt ${t.type}`}>{t.type === 'income' ? '+' : t.type === 'expense' ? '−' : '⇄'}{fmt(t.amount)}</span>
                           <span className="ta-tx-date">{formatDateShort(t.date)}</span>
                         </div>
                       )
@@ -672,6 +721,16 @@ export default function Reports({ data }: Props) {
           </table>
         </div>
       </GlassCard>
+
+      <Modal open={!!drilldown} onClose={() => setDrilldown(null)} title={drilldown ? `AI: ${drilldown.name}` : 'AI'} width={480}>
+        {drilldownLoading && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
+            <div className="spinner" />
+          </div>
+        )}
+        {drilldownError && <p className="form-error">{drilldownError}</p>}
+        {drilldownContent && <MarkdownView content={drilldownContent} />}
+      </Modal>
     </div>
   )
 }

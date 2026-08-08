@@ -61,11 +61,55 @@ jobs:
         run: bun run build
 
       - name: Package and publish Windows artifacts
+        # Signing activates automatically once WIN_CSC_LINK / WIN_CSC_KEY_PASSWORD
+        # secrets are configured in the repo settings — until then this
+        # produces an unsigned .exe (see README FAQ on the SmartScreen warning).
         run: bunx electron-builder --win --publish always --config electron-builder.config.js
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
-  # ── 3. Linux — AppImage + deb + rpm ─────────────────────────────────────────
+  # ── 3. macOS — dmg + zip (Intel + Apple Silicon) ────────────────────────────
+  build-macos:
+    name: macOS (dmg + zip)
+    needs: create-release
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: macos-node_modules-${{ hashFiles('bun.lock') }}
+          restore-keys: macos-node_modules-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Compile TypeScript
+        run: bun run build
+
+      - name: Package and publish macOS artifacts
+        # Signing/notarization activate automatically once these secrets are
+        # configured in the repo settings — until then this produces an
+        # unsigned build, same as Windows without a code-signing cert.
+        run: bunx electron-builder --mac --publish always --config electron-builder.config.js
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+  # ── 4. Linux — AppImage + deb + rpm ─────────────────────────────────────────
   build-linux:
     name: Linux (AppImage + deb + rpm)
     needs: create-release
